@@ -98,7 +98,7 @@ Once inside, the file system layout is standard Linux/Termux, with two special a
 *   **Busybox Static**: The `busybox_arm64` binary used in this project is provided by **EXALAB**.
     *   Source: [EXALAB/Busybox-static](https://github.com/EXALAB/Busybox-static/blob/main/busybox_arm64)
     *   It is used here to ensure a stable, static environment for the initial chroot process.
-*   **Google Gemini**: Generate the whole `termux-sandbox` and the draft of this `README.md`.
+*   **Co-piloted with Google Gemini**: Leveraging AI for rapid prototyping and error handling optimization.
 
 ## 📜 License
 
