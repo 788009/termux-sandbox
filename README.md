@@ -87,17 +87,11 @@ Once inside, the file system layout is standard Linux/Termux, with two special a
 > *   Deleting files in `/sdcard` deletes them from your phone.
 > *   Deleting files in `/host_root` **WILL BRICK** your phone.
 
-## ❓ FAQ
-
-### How it works
+## ❓ How it works
 
 1.  **Chroot:** Changes the root directory to `~/.termux-sandbox/{name}`.
 2.  **Mount Namespaces:** Uses `mount --rbind` to bring your Android Kernel directories (`/dev`, `/proc`, `/sys`) and partitions into the sandbox.
 3.  **LD_PRELOAD:** Loads a compiled C library that intercepts `getuid()` calls. It tells applications "You are user 10000" even though you are Root, preventing permission errors common in Termux Chroots.
-
-### Why not use `proot`?
-
-Proot relies on `ptrace` to intercept system calls, which is slower and can have compatibility issues with multithreaded apps. This script uses native Linux `chroot`, which is faster and more stable but requires Root.
 
 ## ❤️ Credits & Attribution
 
