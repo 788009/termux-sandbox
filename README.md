@@ -53,8 +53,7 @@ pkg install tsu curl zip clang -y
 ### 2. Install the sandbox manager script
 
 ```bash
-curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" \
-     -o $PREFIX/bin/termux-sandbox
+curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o $PREFIX/bin/termux-sandbox
 chmod +x $PREFIX/bin/termux-sandbox
 ```
 
@@ -62,8 +61,7 @@ chmod +x $PREFIX/bin/termux-sandbox
 
 ```bash
 mkdir -p ~/.suroot
-curl -L 'https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64' \
-     -o ~/.suroot/busybox_arm64
+curl -L 'https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64' -o ~/.suroot/busybox_arm64
 chmod 755 ~/.suroot/busybox_arm64
 ```
 
