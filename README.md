@@ -42,6 +42,7 @@ chmod +x $PREFIX/bin/termux-sandbox
 The sandbox requires a static busybox binary placed in the Root Home directory (`~/.suroot`). Run this command to download and install it automatically:
 
 ```bash
+mkdir -p /data/data/com.termux/files/home/.suroot
 curl -L 'https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64' -o /data/data/com.termux/files/home/.suroot/busybox_arm64 && chmod 755 /data/data/com.termux/files/home/.suroot/busybox_arm64
 ```
 
