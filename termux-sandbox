@@ -166,13 +166,17 @@ cmd_enter() {
         [[ "$HOME/.termux-sandbox" == *"$name"* ]] && continue
         [[ "$name" == "etc" ]] && continue
         
+        case "$name" in
+            sdcard|storage) continue ;;
+        esac
+
         if [ -L "$item" ]; then
             target=$(readlink "$item")
             rm -f "$CHROOT_ROOT/$name"
             ln -sf "$target" "$CHROOT_ROOT/$name"
         elif [ -d "$item" ]; then
             case "$name" in
-                data|mnt|storage|sdcard|dev|proc|sys) ;; 
+                data|mnt|dev|proc|sys) ;; 
                 *)
                     mkdir -p "$CHROOT_ROOT/$name"
                     $MOUNT_BIN --rbind "$item" "$CHROOT_ROOT/$name" ;;
