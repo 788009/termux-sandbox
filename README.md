@@ -5,9 +5,16 @@
 Termux Sandbox provides isolated, clean Termux environments that run with native performance inside an existing Termux installation.  
 It is designed for testing scripts, building software, or keeping the main environment minimal without relying on proot or container runtimes.
 
+![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
+
+<details>
+<summary>More images</summary>
+
 ![example-create.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-create.jpg?raw=true)
 
 ![example-use.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-use.jpg?raw=true)
+
+</details>
 
 ## Features
 
