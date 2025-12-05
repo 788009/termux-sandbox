@@ -1,6 +1,5 @@
 # Termux Sandbox
 
-[![Termux](https://img.shields.io/badge/Termux-Rolling-green.svg)](https://termux.dev/)
 [![Root Required](https://img.shields.io/badge/Root-Required-red.svg)](https://github.com/788009/termux-sandbox)
 
 **Termux Sandbox** allows you to run **clean, isolated, and native** Termux environments inside your existing Termux installation.
