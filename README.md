@@ -29,7 +29,7 @@ You can install everything using the commands below.
 ### 1. Install Dependencies
 ```bash
 pkg update
-pkg install tsu curl zip clang
+pkg install tsu curl zip clang -y
 ```
 
 ### 2. Install the Script
