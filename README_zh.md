@@ -55,6 +55,8 @@ chmod 755 ~/.suroot/busybox_arm64
 
 ## 使用方法
 
+**要求 `tsu` 环境**
+
 ### 创建新沙盒
 
 ```bash

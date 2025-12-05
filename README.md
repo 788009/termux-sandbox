@@ -58,6 +58,8 @@ chmod 755 ~/.suroot/busybox_arm64
 
 ## Usage
 
+**Requires `tsu` environment.**
+
 ### Create a new sandbox
 
 ```bash
