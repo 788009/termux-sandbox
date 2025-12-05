@@ -118,10 +118,34 @@ cmd_enter() {
         echo "[!] Sandbox not found."; exit 1
     fi
 
+    # Privilege check
     if [ "$(id -u)" != "0" ]; then tsu -c "$(realpath "$0") enter $SANDBOX_NAME"; exit $?; fi
 
     echo "[+] [ROOT] Entering sandbox: $SANDBOX_NAME"
     
+    # Pre-define variable for cleanup use
+    CHROOT_ROOT="$SANDBOX_BASE"
+
+    # ================= SAFETY TRAP =================
+    # Define cleanup function: will be executed regardless of exit
+    cleanup_mounts() {
+        # Prevent interruption during cleanup
+        trap '' EXIT INT TERM
+        
+        echo
+        echo "[*] Cleaning up mounts..."
+        
+        # Unmount mount points in reverse order (sort -r ensures subdirectories are unmounted first)
+        grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
+        
+        # Delete temporary files
+        rm -f "$CHROOT_ROOT/busybox_static" "$CHROOT_ROOT/entry.sh"
+    }
+
+    # Register signal traps: EXIT (normal exit), INT (Ctrl+C), TERM (termination signal)
+    trap cleanup_mounts EXIT INT TERM
+    # =========================================================
+
     REPO_IP=$(resolve_ip "$TARGET_DOMAIN")
     [ -z "$REPO_IP" ] && REPO_IP="104.21.57.147"
     DNS_SERVER=$(check_dns)
@@ -130,7 +154,6 @@ cmd_enter() {
     echo "deb https://$TARGET_DOMAIN/apt/termux-main stable main" > "$SOURCES_LIST"
     rm -f "$SANDBOX_BASE/data/data/com.termux/files/usr/etc/apt/apt.conf.d/99-trust-all"
 
-    CHROOT_ROOT="$SANDBOX_BASE"
     MOUNT_BIN="/system/bin/mount"
     
     cp "$SANDBOX_BASE/busybox-static" "$CHROOT_ROOT/busybox_static"
@@ -183,7 +206,6 @@ cmd_enter() {
             # Create the folder in our tmpfs
             mkdir -p "$CHROOT_ROOT/host_root/$name"
             # RECURSIVE BIND (--rbind) is crucial here!
-            # It brings the directory AND any partitions mounted inside it (like /data, /apex, /storage)
             $MOUNT_BIN --rbind "$item" "$CHROOT_ROOT/host_root/$name"
         fi
     done
@@ -245,12 +267,6 @@ EOF
     chmod 755 "$CHROOT_ROOT/entry.sh"
 
     chroot "$CHROOT_ROOT" /busybox_static sh /entry.sh
-
-    echo
-    echo "[+] Cleanup..."
-    # Lazy unmount is safe for recursive mounts
-    grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
-    rm -f "$CHROOT_ROOT/busybox_static" "$CHROOT_ROOT/entry.sh"
 }
 
 cmd_delete() {
