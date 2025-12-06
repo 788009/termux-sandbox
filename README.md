@@ -73,6 +73,8 @@ chmod 755 ~/.suroot/busybox_arm64
 
 **Requires `tsu` environment.**
 
+If no name is specified for the following commands, the actual name used will be `default`.
+
 ### Create a new sandbox
 
 ```bash
@@ -89,6 +91,12 @@ termux-sandbox enter
 termux-sandbox enter dev
 ```
 
+### Exiting the sandbox
+
+`Ctrl` + `D`
+
+If unable to exit the sandbox for any reason, please reboot your device (and feel free to open an issue).
+
 ### Remove a sandbox
 
 ```bash
@@ -96,6 +104,10 @@ termux-sandbox delete
 # or with name
 termux-sandbox delete dev
 ```
+
+**WARNING**: **ALWAYS use the termux-sandbox delete command to remove a sandbox.**
+
+**NEVER manually delete the sandbox directory (e.g., using rm or a file manager) from outside the environment.** If the sandbox's host mounts are still active, removing the directory will directly delete files on your device.
 
 ## Inside the Sandbox
 

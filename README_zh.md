@@ -71,6 +71,8 @@ chmod 755 ~/.suroot/busybox_arm64
 
 **需要 `tsu` 环境**
 
+以下命令若未指定名称，则实际名称为 `default`。
+
 ### 创建新沙盒
 
 ```bash
@@ -87,6 +89,12 @@ termux-sandbox enter
 termux-sandbox enter dev
 ```
 
+### 退出沙盒
+
+`Ctrl` + `D`
+
+若因为某些原因无法退出沙盒，请重启设备（也欢迎提 issue）。
+
 ### 删除沙盒
 
 ```bash
@@ -94,6 +102,8 @@ termux-sandbox delete
 # 或者指定名称
 termux-sandbox delete dev
 ```
+
+**警告**：**请务必使用 `termux-sandbox delete` 命令移除沙盒，严禁直接通过 `rm` 或文件管理器等方式在沙盒外部删除目录**，若挂载仍在生效，删除目录将直接删除设备的所有文件。
 
 ## 特殊路径
 
