@@ -507,8 +507,20 @@ cmd_duplicate() {
 }
 
 cmd_export() {
-    local TARGET_NAME="$1"
-    local OUTPUT_FILE="$2"
+    local TARGET_NAME=""
+    local OUTPUT_FILE=""
+
+    # Parsing arguments to handle potential future flags
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            *)
+                if [ -z "$TARGET_NAME" ]; then TARGET_NAME="$1"; 
+                elif [ -z "$OUTPUT_FILE" ]; then OUTPUT_FILE="$1"; 
+                fi
+                shift
+                ;;
+        esac
+    done
 
     if [ -z "$TARGET_NAME" ] || [ -z "$OUTPUT_FILE" ]; then
         echo "Usage: $(basename "$0") export <sandbox_name> <output_file.tar.gz>"
@@ -516,18 +528,14 @@ cmd_export() {
     fi
 
     local SANDBOX_DIR="$HOME/.termux-sandbox/$TARGET_NAME"
-
-    # Resolve absolute path for output file to ensure tar finds it
     local ABS_OUTPUT_PATH=$(realpath "$OUTPUT_FILE")
 
-    # Check if sandbox exists
     if [ ! -d "$SANDBOX_DIR" ]; then
         echo "[!] Sandbox '$TARGET_NAME' not found."
         return
     fi
 
-    # Check if sandbox is currently active (must stop before export)
-    if is_active "$TARGET_NAME"; then
+    if grep -q "$SANDBOX_DIR" /proc/mounts; then
         echo "[!] Sandbox is active. Please exit/stop it first."
         return
     fi
@@ -536,7 +544,7 @@ cmd_export() {
     echo "    Source: $SANDBOX_DIR"
     echo "    Output: $ABS_OUTPUT_PATH"
 
-    # Clean APT cache to reduce archive size
+    # 1. Clean APT cache
     local APT_CACHE="$SANDBOX_DIR/data/data/com.termux/files/usr/var/cache/apt/archives"
     if [ -d "$APT_CACHE" ]; then
         echo "[*] Cleaning APT cache to save space..."
@@ -544,16 +552,18 @@ cmd_export() {
         rm -f "$APT_CACHE/partial"/*
     fi
 
-    # Compress the sandbox
-    # Using tsu to preserve root/10000 ownership
-    # --exclude: Exclude runtime files, mount points, and temp files
+    # 2. Generate Metadata
+    local META_FILE="$SANDBOX_DIR/.sandbox_meta"
+    echo "ARCH=$ARCH" > "$META_FILE"
+    echo "TIMESTAMP=$(date +%s)" >> "$META_FILE"
+    echo "VERSION=1.0" >> "$META_FILE"
+
     echo "[*] Compressing..."
     
-    # Get the parent directory (e.g., /.../.termux-sandbox)
     local PARENT_DIR=$(dirname "$SANDBOX_DIR")
     local DIR_NAME=$(basename "$SANDBOX_DIR")
 
-    # Use a subshell to change directory safely without affecting the main script
+    # 3. Create Archive
     (
         cd "$PARENT_DIR" || exit 1
         tar czvf "$ABS_OUTPUT_PATH" \
@@ -564,8 +574,13 @@ cmd_export() {
             --exclude="$DIR_NAME/data/data/com.termux/files/usr/tmp/*" \
             "$DIR_NAME"
     )
+    
+    local STATUS=$?
 
-    if [ $? -eq 0 ]; then
+    # 4. Clean up metadata from source
+    rm -f "$META_FILE"
+
+    if [ $STATUS -eq 0 ]; then
         echo "[+] Export complete: $ABS_OUTPUT_PATH"
     else
         echo "[!] Export failed."
@@ -573,10 +588,31 @@ cmd_export() {
 }
 
 cmd_import() {
-    local ARCHIVE_FILE="$1"
+    local ARCHIVE_FILE=""
+    local FORCE_IMPORT=false
+
+    # Argument Parsing
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--force)
+                FORCE_IMPORT=true
+                shift
+                ;;
+            -*)
+                echo "[!] Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                if [ -z "$ARCHIVE_FILE" ]; then
+                    ARCHIVE_FILE="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
     
     if [ -z "$ARCHIVE_FILE" ]; then
-        echo "Usage: $(basename "$0") import <file.tar.gz>"
+        echo "Usage: $(basename "$0") import <file.tar.gz> [-f|--force]"
         return
     fi
     
@@ -587,12 +623,52 @@ cmd_import() {
         return
     fi
 
+    # === Metadata Validation ===
+    # If forced, we skip the expensive tar scan entirely to save time.
+    if [ "$FORCE_IMPORT" = true ]; then
+        echo "[*] Force mode enabled: Skipping metadata verification."
+    else
+        echo "[*] Verifying metadata..."
+        
+        # Try to locate the .sandbox_meta file within the archive without extracting everything
+        local META_PATH_IN_TAR=$(tar tzf "$ABS_ARCHIVE_PATH" 2>/dev/null | grep "/.sandbox_meta$" | head -n 1)
+        
+        if [ -n "$META_PATH_IN_TAR" ]; then
+            # Extract only the metadata file to stdout
+            local META_CONTENT=$(tar xzOf "$ABS_ARCHIVE_PATH" "$META_PATH_IN_TAR" 2>/dev/null)
+            
+            # Parse architecture
+            local TAR_ARCH=$(echo "$META_CONTENT" | grep "ARCH=" | cut -d= -f2)
+            
+            echo "    Target Arch: $TAR_ARCH"
+            echo "    System Arch: $ARCH"
+            
+            if [ "$TAR_ARCH" != "$ARCH" ]; then
+                echo "❌ Error: Architecture mismatch!"
+                echo "    The sandbox was built for '$TAR_ARCH' but this device is '$ARCH'."
+                echo "    Importing this will likely result in binary format errors."
+                echo "    Use --force to skip this check if you are sure."
+                return 1
+            else
+                echo "[+] Architecture match."
+            fi
+        else
+            # No metadata found (legacy archive or manual backup)
+            echo "❌ Error: No metadata (.sandbox_meta) found in archive."
+            echo "    This might be a legacy archive or manually created backup."
+            echo "    Use --force to import legacy/unverified archives."
+            return 1
+        fi
+    fi
+    # ===========================
+
     local BASE_DIR="$HOME/.termux-sandbox"
     mkdir -p "$BASE_DIR"
 
     echo "[*] Importing from $ABS_ARCHIVE_PATH..."
     
-    # Use absolute path and 'tar xzvpf' (no dash)
+    # Extract archive
+    # -p: Preserve permissions (Essential for restoring the environment)
     tar xzvpf "$ABS_ARCHIVE_PATH" -C "$BASE_DIR"
     
     if [ $? -eq 0 ]; then
@@ -638,23 +714,23 @@ cmd_list() {
 }
 
 case "$1" in
-    create)    shift; cmd_create "$@" ;;
-    enter)     shift; cmd_enter "$@"  ;;
-    delete)    shift; cmd_delete "$@" ;;
-    rename)    shift; cmd_rename "$@" ;;
+    create) shift; cmd_create "$@" ;;
+    enter)  shift; cmd_enter "$@"  ;;
+    delete) shift; cmd_delete "$@" ;;
+    rename) shift; cmd_rename "$@" ;;
     duplicate) shift; cmd_duplicate "$@" ;;
-    export)    shift; cmd_export "$@" ;;
-    import)    shift; cmd_import "$@" ;;
-    list)      cmd_list ;;
+    export) shift; cmd_export "$@" ;;
+    import) shift; cmd_import "$@" ;;
+    list)   cmd_list ;;
     *) 
         echo "Usage:"
         echo "  $(basename "$0") create [name]"
         echo "  $(basename "$0") enter [name] [--bind|-b]"
         echo "  $(basename "$0") delete [name]"
-        echo "  $(basename "$0") rename <old_name> <new_name>"
-        echo "  $(basename "$0") duplicate <src_name> <new_name>"
+        echo "  $(basename "$0") rename <old> <new>"
+        echo "  $(basename "$0") duplicate <src> <dest>"
         echo "  $(basename "$0") export <name> <file.tar.gz>"
-        echo "  $(basename "$0") import <file.tar.gz>"
+        echo "  $(basename "$0") import <file.tar.gz> [--force|-f]"
         echo "  $(basename "$0") list"
         exit 1
         ;;
