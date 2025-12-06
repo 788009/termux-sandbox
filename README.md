@@ -52,6 +52,8 @@ pkg update
 pkg install tsu curl zip clang -y
 ```
 
+*(`clang` is required to compile `fake_uid.c` for UID spoofing.)*
+
 ### 2. Install the sandbox manager script
 
 ```bash

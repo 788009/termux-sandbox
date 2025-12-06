@@ -50,6 +50,8 @@ pkg update
 pkg install tsu curl zip clang -y
 ```
 
+*（`clang` 用于编译 `fake_uid.c`，实现 UID 欺骗）*
+
 ### 2. 安装 termux-sandbox 脚本
 
 ```bash
