@@ -34,12 +34,14 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
   - **无侵入设计**  
     沙盒保持极简与隔离，除非显式操作，否则绝不修改或污染原本的 Termux 环境。
 
-## 需求
+## 要求
 
   - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU，其他方案不保证）。
   - ARM64 (aarch64) 架构。
   - 已安装 Termux 应用。
   - BusyBox 静态二进制文件（下方提供）。
+
+**若没有 Root 权限**，可以尝试 [Yonle/termux-proot](https://github.com/Yonle/termux-proot)。
 
 ## 安装
 

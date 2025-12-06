@@ -43,6 +43,8 @@ It is designed for testing scripts, building software, or keeping the main envir
 - Current Termux installation
 - BusyBox static binary (provided below)
 
+**Note**: **For non-root users**, use [Yonle/termux-proot](https://github.com/Yonle/termux-proot) instead.
+
 ## Installation
 
 ### 1. Install basic dependencies
