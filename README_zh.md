@@ -156,10 +156,14 @@ termux-sandbox duplicate mysandbox mysandbox2
 termux-sandbox export mysandbox mysandbox.tar.gz
 ```
 
+这条命令会导出带有元数据（metadata）的完整沙盒环境。
+
 ### 导入沙盒
 
 ```bash
 termux-sandbox import mysandbox.tar.gz
+# 使用 --force 或 -f 以跳过元数据检查
+termux-sandbox import mysandbox.tar.gz -f
 ```
 
 </details>

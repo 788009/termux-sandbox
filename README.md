@@ -105,7 +105,7 @@ Use the `-b` or `--bind` flag to mount host directories (`/sdcard` and `/host_ro
 ```bash
 termux-sandbox enter -b
 # or with name
-termux-sandbox enter -b mysandbox
+termux-sandbox enter mysandbox -b
 ```
 
 **Warning for Unrestricted Mode:**
@@ -155,10 +155,14 @@ termux-sandbox duplicate mysandbox mysandbox2
 termux-sandbox export mysandbox mysandbox.tar.gz
 ```
 
+This command exports the complete sandbox environment, including all its metadata.
+
 ### Import a sandbox
 
 ```bash
 termux-sandbox import mysandbox.tar.gz
+# or skip verifying metadata with --force or -f
+termux-sandbox import mysandbox.tar.gz -f
 ```
 
 </details>
