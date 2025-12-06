@@ -3,6 +3,8 @@
 Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具备原生性能**的 Termux 环境。  
 该工具专为脚本测试、软件编译或维持主环境整洁而设计，无需依赖 `proot` 或容器运行时。
 
+**注意**：该工具仅提供**环境**隔离，没有**权限**隔离，因此**严禁**用于恶意脚本测试。
+
 ![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
 
 <details>
