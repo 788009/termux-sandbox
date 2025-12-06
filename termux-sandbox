@@ -186,7 +186,7 @@ cmd_enter() {
     if [ "$(id -u)" != "0" ]; then 
         OPTS=""
         if [ "$BIND_HOST" = true ]; then OPTS="-b"; fi
-        tsu -c "$(realpath "$0") enter $OPTS $SANDBOX_NAME"
+        $(realpath "$0") enter $OPTS $SANDBOX_NAME
         exit $?
     fi
 
@@ -355,7 +355,7 @@ EOF
 
 cmd_delete() {
     # 1. Root privilege check
-    if [ "$(id -u)" != "0" ]; then tsu -c "$(realpath "$0") delete $SANDBOX_NAME"; exit $?; fi
+    if [ "$(id -u)" != "0" ]; then $(realpath "$0") delete $SANDBOX_NAME; exit $?; fi
     
     # 2. Check if the sandbox directory exists
     if [ ! -d "$SANDBOX_BASE" ]; then
@@ -392,6 +392,102 @@ cmd_delete() {
     # 5. Only execute deletion after confirming no mounts remain
     rm -rf "$SANDBOX_BASE"
     echo "[+] Sandbox deleted successfully."
+}
+
+cmd_export() {
+    local TARGET_NAME="$1"
+    local OUTPUT_FILE="$2"
+
+    if [ -z "$TARGET_NAME" ] || [ -z "$OUTPUT_FILE" ]; then
+        echo "Usage: $(basename "$0") export <sandbox_name> <output_file.tar.gz>"
+        return
+    fi
+
+    local SANDBOX_DIR="$HOME/.termux-sandbox/$TARGET_NAME"
+
+    # Resolve absolute path for output file to ensure tar finds it
+    local ABS_OUTPUT_PATH=$(realpath "$OUTPUT_FILE")
+
+    # Check if sandbox exists
+    if [ ! -d "$SANDBOX_DIR" ]; then
+        echo "[!] Sandbox '$TARGET_NAME' not found."
+        return
+    fi
+
+    # Check if sandbox is currently active (must stop before export)
+    if grep -q "$SANDBOX_DIR" /proc/mounts; then
+        echo "[!] Sandbox is active. Please exit/stop it first."
+        return
+    fi
+
+    echo "[*] Exporting sandbox: $TARGET_NAME"
+    echo "    Source: $SANDBOX_DIR"
+    echo "    Output: $ABS_OUTPUT_PATH"
+
+    # Clean APT cache to reduce archive size
+    local APT_CACHE="$SANDBOX_DIR/data/data/com.termux/files/usr/var/cache/apt/archives"
+    if [ -d "$APT_CACHE" ]; then
+        echo "[*] Cleaning APT cache to save space..."
+        rm -f "$APT_CACHE"/*.deb
+        rm -f "$APT_CACHE/partial"/*
+    fi
+
+    # Compress the sandbox
+    # Using tsu to preserve root/10000 ownership
+    # --exclude: Exclude runtime files, mount points, and temp files
+    echo "[*] Compressing..."
+    
+    # Get the parent directory (e.g., /.../.termux-sandbox)
+    local PARENT_DIR=$(dirname "$SANDBOX_DIR")
+    local DIR_NAME=$(basename "$SANDBOX_DIR")
+
+    # Use a subshell to change directory safely without affecting the main script
+    (
+        cd "$PARENT_DIR" || exit 1
+        tar czvf "$ABS_OUTPUT_PATH" \
+            --exclude="$DIR_NAME/entry.sh" \
+            --exclude="$DIR_NAME/busybox_static" \
+            --exclude="$DIR_NAME/sdcard/*" \
+            --exclude="$DIR_NAME/host_root/*" \
+            --exclude="$DIR_NAME/data/data/com.termux/files/usr/tmp/*" \
+            "$DIR_NAME"
+    )
+
+    if [ $? -eq 0 ]; then
+        echo "[+] Export complete: $ABS_OUTPUT_PATH"
+    else
+        echo "[!] Export failed."
+    fi
+}
+
+cmd_import() {
+    local ARCHIVE_FILE="$1"
+    
+    if [ -z "$ARCHIVE_FILE" ]; then
+        echo "Usage: $(basename "$0") import <file.tar.gz>"
+        return
+    fi
+    
+    local ABS_ARCHIVE_PATH=$(realpath "$ARCHIVE_FILE")
+    
+    if [ ! -f "$ABS_ARCHIVE_PATH" ]; then
+        echo "[!] File not found: $ARCHIVE_FILE"
+        return
+    fi
+
+    local BASE_DIR="$HOME/.termux-sandbox"
+    mkdir -p "$BASE_DIR"
+
+    echo "[*] Importing from $ABS_ARCHIVE_PATH..."
+    
+    # Use absolute path and 'tar xzvpf' (no dash)
+    tar xzvpf "$ABS_ARCHIVE_PATH" -C "$BASE_DIR"
+    
+    if [ $? -eq 0 ]; then
+        echo "[+] Import complete."
+    else
+        echo "[!] Import failed."
+    fi
 }
 
 cmd_list() {
@@ -437,12 +533,16 @@ case "$1" in
     create) shift; cmd_create "$@" ;;
     enter)  shift; cmd_enter "$@"  ;;
     delete) shift; cmd_delete "$@" ;;
+    export) shift; cmd_export "$@" ;;
+    import) shift; cmd_import "$@" ;;
     list)   cmd_list ;;
     *) 
         echo "Usage:"
         echo "  $(basename "$0") create [name]"
         echo "  $(basename "$0") enter [name] [--bind|-b]"
         echo "  $(basename "$0") delete [name]"
+        echo "  $(basename "$0") export <name> <file.tar.gz>"
+        echo "  $(basename "$0") import <file.tar.gz>"
         echo "  $(basename "$0") list"
         exit 1
         ;;
