@@ -114,26 +114,67 @@ cmd_create() {
 }
 
 cmd_enter() {
+    # === 1. Argument Parsing ===
+    local TARGET_NAME=""
+    local BIND_HOST=false  # Default: Do not mount sensitive host directories (Safety First)
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -b|--bind)
+                BIND_HOST=true
+                shift
+                ;;
+            -*)
+                echo "[!] Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                if [ -z "$TARGET_NAME" ]; then
+                    TARGET_NAME="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # If no name provided, use default
+    SANDBOX_NAME="${TARGET_NAME:-default}"
+    # Update global variable (since script header might have run before we knew the name)
+    SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
+    
+    # === 2. Basic Checks ===
     if [ ! -d "$SANDBOX_BASE/data/data/com.termux/files/usr/bin" ]; then 
-        echo "[!] Sandbox not found."; exit 1
+        echo "[!] Sandbox '$SANDBOX_NAME' not found."; exit 1
     fi
 
     # Privilege check
-    if [ "$(id -u)" != "0" ]; then tsu -c "$(realpath "$0") enter $SANDBOX_NAME"; exit $?; fi
+    # We need to pass the arguments back to tsu so the recursive call knows about -b
+    if [ "$(id -u)" != "0" ]; then 
+        OPTS=""
+        if [ "$BIND_HOST" = true ]; then OPTS="-b"; fi
+        tsu -c "$(realpath "$0") enter $OPTS $SANDBOX_NAME"
+        exit $?
+    fi
 
     echo "[+] [ROOT] Entering sandbox: $SANDBOX_NAME"
-    
-    # Pre-define variable for cleanup use
+    if [ "$BIND_HOST" = true ]; then
+        echo "    ⚠️  Mode: UNRESTRICTED (Host Mounted)"
+    else
+        echo "    🛡️  Mode: SAFE (Isolated)"
+    fi
+
+    # Pre-define variables for cleanup
     CHROOT_ROOT="$SANDBOX_BASE"
+    MOUNT_BIN="/system/bin/mount"
 
     # ================= SAFETY TRAP =================
-    # Define cleanup function: will be executed regardless of exit
+    # Define cleanup function: will be executed regardless of exit (crash, Ctrl+C, or success)
     cleanup_mounts() {
         # Prevent interruption during cleanup
         trap '' EXIT INT TERM
         
-        echo
-        echo "[*] Cleaning up mounts..."
+        # Uncomment the next line if you want to see cleanup logs
+        # echo "[*] Cleaning up mounts..."
         
         # Unmount mount points in reverse order (sort -r ensures subdirectories are unmounted first)
         grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
@@ -144,7 +185,7 @@ cmd_enter() {
 
     # Register signal traps: EXIT (normal exit), INT (Ctrl+C), TERM (termination signal)
     trap cleanup_mounts EXIT INT TERM
-    # =========================================================
+    # ===============================================
 
     REPO_IP=$(resolve_ip "$TARGET_DOMAIN")
     [ -z "$REPO_IP" ] && REPO_IP="104.21.57.147"
@@ -154,22 +195,22 @@ cmd_enter() {
     echo "deb https://$TARGET_DOMAIN/apt/termux-main stable main" > "$SOURCES_LIST"
     rm -f "$SANDBOX_BASE/data/data/com.termux/files/usr/etc/apt/apt.conf.d/99-trust-all"
 
-    MOUNT_BIN="/system/bin/mount"
-    
     cp "$SANDBOX_BASE/busybox-static" "$CHROOT_ROOT/busybox_static"
     chmod 755 "$CHROOT_ROOT/busybox_static"
 
-    # === BASE SYSTEM MOUNTS ===
+    # === BASE SYSTEM MOUNTS (Essential) ===
     # Mount necessary directories for the sandbox OS to function
     for item in /*; do
         name=$(basename "$item")
         [[ "$HOME/.termux-sandbox" == *"$name"* ]] && continue
         [[ "$name" == "etc" ]] && continue
         
+        # Skip sensitive directories here.
+        # They will be handled later in the OPTIONAL section based on flags.
         case "$name" in
-            sdcard|storage) continue ;;
+            sdcard|storage|host_root) continue ;; 
         esac
-
+        
         if [ -L "$item" ]; then
             target=$(readlink "$item")
             rm -f "$CHROOT_ROOT/$name"
@@ -193,36 +234,37 @@ cmd_enter() {
     mkdir -p "$CHROOT_ROOT/system"
     $MOUNT_BIN --rbind /system "$CHROOT_ROOT/system"
 
-    # === FIXED HOST ROOT (Mirror Strategy) ===
-    # 1. Clean existing host_root
-    mkdir -p "$CHROOT_ROOT/host_root"
-    
-    # 2. Mount a TMPFS (RAM Disk) to /host_root
-    # This allows us to create mountpoints without modifying actual storage
-    $MOUNT_BIN -t tmpfs tmpfs "$CHROOT_ROOT/host_root"
-    
-    echo "[*] Mirroring Host Root to /host_root..."
-    # 3. Iterate through every item in Host Root
-    for item in /*; do
-        name=$(basename "$item")
-        # Check if it's a directory (we only mirror directories)
-        if [ -d "$item" ]; then
-            # Create the folder in our tmpfs
-            mkdir -p "$CHROOT_ROOT/host_root/$name"
-            # RECURSIVE BIND (--rbind) is crucial here!
-            $MOUNT_BIN --rbind "$item" "$CHROOT_ROOT/host_root/$name"
+    # === OPTIONAL HOST MOUNTS ===
+    if [ "$BIND_HOST" = true ]; then
+        # Only execute if -b / --bind is passed
+        
+        # --- 1. HOST ROOT ---
+        # Strategy: Use tmpfs to avoid creating folders on real partition
+        mkdir -p "$CHROOT_ROOT/host_root"
+        $MOUNT_BIN -t tmpfs tmpfs "$CHROOT_ROOT/host_root"
+        
+        # echo "[*] Mirroring Host Root..."
+        for item in /*; do
+            name=$(basename "$item")
+            if [ -d "$item" ]; then
+                mkdir -p "$CHROOT_ROOT/host_root/$name"
+                $MOUNT_BIN --rbind "$item" "$CHROOT_ROOT/host_root/$name"
+            fi
+        done
+        
+        # --- 2. SDCARD ---
+        rm -rf "$CHROOT_ROOT/sdcard"
+        mkdir -p "$CHROOT_ROOT/sdcard"
+        if [ -d "/data/media/0" ]; then
+            $MOUNT_BIN --bind "/data/media/0" "$CHROOT_ROOT/sdcard"
+        else
+            $MOUNT_BIN --bind "/sdcard" "$CHROOT_ROOT/sdcard"
         fi
-    done
-    # =========================================
-
-    # === FIXED SDCARD (Direct Mount) ===
-    rm -rf "$CHROOT_ROOT/sdcard"
-    mkdir -p "$CHROOT_ROOT/sdcard"
-    if [ -d "/data/media/0" ]; then
-        $MOUNT_BIN --bind "/data/media/0" "$CHROOT_ROOT/sdcard"
     else
-        $MOUNT_BIN --bind "/sdcard" "$CHROOT_ROOT/sdcard"
+        # Safe Mode: Ensure these directories are empty or non-existent
+        rm -rf "$CHROOT_ROOT/sdcard" "$CHROOT_ROOT/host_root"
     fi
+    # ========================================
 
     # === ETC & NETWORKING ===
     $MOUNT_BIN -t tmpfs tmpfs "$CHROOT_ROOT/system/etc"
@@ -258,7 +300,11 @@ FAKE_LIB="\$TERMUX_USR/lib/libfakeuid.so"
 
 echo "----------------------------------------"
 echo "[*] Sandbox: $SANDBOX_NAME"
-echo "[*] /host_root: Full Access (Recursive)"
+if [ "$BIND_HOST" = true ]; then
+    echo "WARNING: /sdcard and /host_root are ACCESSIBLE."
+else
+    echo "NOTE: Running in isolated mode (No /sdcard access)."
+fi
 echo "----------------------------------------"
 
 if [ -x "\$TERMUX_BASH" ]; then
@@ -354,13 +400,15 @@ cmd_list() {
 }
 
 case "$1" in
-    create) cmd_create ;;
-    enter)  cmd_enter ;;
-    delete) cmd_delete ;;
+    create) shift; cmd_create "$@" ;;
+    enter)  shift; cmd_enter "$@"  ;;
+    delete) shift; cmd_delete "$@" ;;
     list)   cmd_list ;;
-    *)
-        echo "Usage: "
-        echo "  $(basename "$0") {create|enter|delete} [name]"
+    *) 
+        echo "Usage:"
+        echo "  $(basename "$0") create [name]"
+        echo "  $(basename "$0") enter [name] [--bind|-b]"
+        echo "  $(basename "$0") delete [name]"
         echo "  $(basename "$0") list"
         exit 1
         ;;
