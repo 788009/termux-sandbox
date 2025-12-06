@@ -61,14 +61,6 @@ curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-
 chmod +x $PREFIX/bin/termux-sandbox
 ```
 
-### 3. 安装静态 BusyBox
-
-```bash
-mkdir -p ~/.suroot
-curl -L 'https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64' -o ~/.suroot/busybox_arm64
-chmod 755 ~/.suroot/busybox_arm64
-```
-
 ## 使用方法
 
 **需要 `tsu` 环境**

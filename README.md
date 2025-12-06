@@ -63,14 +63,6 @@ curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-
 chmod +x $PREFIX/bin/termux-sandbox
 ```
 
-### 3. Install a static BusyBox binary
-
-```bash
-mkdir -p ~/.suroot
-curl -L 'https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64' -o ~/.suroot/busybox_arm64
-chmod 755 ~/.suroot/busybox_arm64
-```
-
 ## Usage
 
 **Requires `tsu` environment.**
