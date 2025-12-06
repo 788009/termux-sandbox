@@ -109,6 +109,8 @@ termux-sandbox delete dev
 
 **NEVER manually delete the sandbox directory (e.g., using rm or a file manager) from outside the environment.** If the sandbox's host mounts are still active, removing the directory will directly delete files on your device.
 
+Also, for this reason, if you wish to uninstall Termux, please **reboot your device** first to ensure all mounts have been disconnected.
+
 ## Inside the Sandbox
 
 Once inside, the file system layout is standard Linux/Termux, with two special additions:
