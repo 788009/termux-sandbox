@@ -105,11 +105,11 @@ termux-sandbox enter -b
 termux-sandbox enter -b dev
 ```
 
-> **Warning for Unrestricted Mode:**
-> When using `-b`, you have **Real Root Access** to your physical file system.
->
->   * Deleting files in `/sdcard` will permanently delete them from your phone.
->   * Modifying `/host_root` can **BRICK** your device.
+**Warning for Unrestricted Mode:**
+When using `-b`, you have **Real Root Access** to your physical file system.
+
+  * Deleting files in `/sdcard` will permanently delete them from your phone.
+  * Modifying `/host_root` can **BRICK** your device.
 
 ### Exiting the sandbox
 
@@ -129,13 +129,13 @@ termux-sandbox delete
 termux-sandbox delete dev
 ```
 
-> **CRITICAL WARNING: READ BEFORE DELETING**
-> 
-> 1.  **ALWAYS use the `termux-sandbox delete` command.**
-> 2.  **NEVER manually delete** the sandbox directory (e.g., using `rm` or a file manager) while the > > > sandbox is active.
->        * *Why?* Even in Safe Mode, system directories (`/system`, `/dev`) are mounted. Deleting the folder manually will attempt to delete actual system files, which can **BRICK** your device or cause data loss.
-> 3.  **Uninstalling Termux?**
->        * Please **reboot your device** first. This guarantees that all sandbox mounts are disconnected before the Termux app data is wiped by Android.
+**CRITICAL WARNING: READ BEFORE DELETING**
+ 
+1.  **ALWAYS use the `termux-sandbox delete` command.**
+2.  **NEVER manually delete** the sandbox directory (e.g., using `rm` or a file manager) while the > > > sandbox is active.
+      * *Why?* Even in Safe Mode, system directories (`/system`, `/dev`) are mounted. Deleting the folder manually will attempt to delete actual system files, which can **BRICK** your device or cause data loss.
+3.  **Uninstalling Termux?**
+      * Please **reboot your device** first. This guarantees that all sandbox mounts are disconnected before the Termux app data is wiped by Android.
 
 ## Implementation Overview
 
