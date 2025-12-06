@@ -34,7 +34,7 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
 
 ## 需求
 
-  - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU；其他方案不保证）。
+  - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU，其他方案不保证）。
   - ARM64 (aarch64) 架构。
   - 已安装 Termux 应用。
   - BusyBox 静态二进制文件（下方提供）。
