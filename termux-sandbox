@@ -11,6 +11,7 @@ BOOTSTRAP_URL_AARCH64="https://github.com/termux/termux-packages/releases/downlo
 
 # Busybox configuration
 BUSYBOX_URL="https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64"
+BUSYBOX_SHA256="f3154aad70b2928e3a57be3e4e966d2574904425fd63e717b9aa55933cfaf08c"
 BUSYBOX_PATH="$HOME/busybox_arm64"
 TARGET_DOMAIN="packages-cf.termux.dev"
 # ===============================================
@@ -52,6 +53,7 @@ find_busybox() {
 }
 
 # Check and automatically download Busybox if missing
+# Check and automatically download Busybox if missing
 check_busybox() {
     local EXIST_PATH=$(find_busybox)
     
@@ -62,7 +64,7 @@ check_busybox() {
 
     echo "[!] Busybox binary not found."
     
-    # Architecture check (simple check to prevent downloading on non-arm64)
+    # Architecture check
     if [ "$ARCH" != "aarch64" ]; then
         echo "[!] Warning: Auto-download is configured for aarch64. Your arch is $ARCH."
     fi
@@ -75,6 +77,21 @@ check_busybox() {
         rm -f "$BUSYBOX_PATH"
         exit 1
     fi
+
+    # === SHA256 Verification ===
+    echo "[*] Verifying checksum..."
+    local FILE_HASH=$(sha256sum "$BUSYBOX_PATH" | awk '{print $1}')
+    
+    if [ "$FILE_HASH" != "$BUSYBOX_SHA256" ]; then
+        echo "[!] Error: Checksum mismatch!"
+        echo "    Expected: $BUSYBOX_SHA256"
+        echo "    Actual:   $FILE_HASH"
+        echo "[!] Security Warning: The downloaded file may be corrupted or compromised."
+        rm -f "$BUSYBOX_PATH"
+        exit 1
+    fi
+    echo "[+] Checksum verified."
+    # ===========================
 
     chmod 755 "$BUSYBOX_PATH"
     echo "[+] Busybox installed to $BUSYBOX_PATH"
