@@ -15,6 +15,27 @@ BUSYBOX_PATH="$HOME/busybox_arm64"
 TARGET_DOMAIN="packages-cf.termux.dev"
 # ===============================================
 
+# Check unshare
+if ! command -v unshare >/dev/null; then
+    echo "[!] Error: 'unshare' is required for namespace isolation."
+    echo "    Please run: pkg install util-linux"
+    exit 1
+fi
+
+# Check if a sandbox is currently running
+# Returns 0 (true) if active, 1 (false) if idle
+is_active() {
+    local NAME="$1"
+    local LOCK_FILE="$HOME/.termux-sandbox/$NAME/.active"
+    
+    if [ -f "$LOCK_FILE" ]; then
+        # Optional: You could verify if the PID inside .active still exists, 
+        # but for simplicity, existence of the file implies activity.
+        return 0
+    fi
+    return 1
+}
+
 get_bootstrap_url() {
     case "$ARCH" in
         arm) echo "$BOOTSTRAP_URL_ARM" ;;
@@ -148,197 +169,172 @@ cmd_create() {
 }
 
 cmd_enter() {
-    # === 1. Argument Parsing ===
     local TARGET_NAME=""
-    local BIND_HOST=false  # Default: Do not mount sensitive host directories (Safety First)
+    local BIND_HOST=false
 
+    # === Argument Parsing ===
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -b|--bind)
-                BIND_HOST=true
-                shift
-                ;;
-            -*)
-                echo "[!] Unknown option: $1"
-                exit 1
-                ;;
-            *)
-                if [ -z "$TARGET_NAME" ]; then
-                    TARGET_NAME="$1"
-                fi
-                shift
-                ;;
+            -b|--bind) BIND_HOST=true; shift ;;
+            -*) echo "[!] Unknown option: $1"; exit 1 ;;
+            *) [ -z "$TARGET_NAME" ] && TARGET_NAME="$1"; shift ;;
         esac
     done
 
-    # If no name provided, use default
     SANDBOX_NAME="${TARGET_NAME:-default}"
-    # Update global variable (since script header might have run before we knew the name)
     SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
     
-    # === 2. Basic Checks ===
     if [ ! -d "$SANDBOX_BASE/data/data/com.termux/files/usr/bin" ]; then 
         echo "[!] Sandbox '$SANDBOX_NAME' not found."; exit 1
     fi
 
-    # Privilege check
-    # We need to pass the arguments back to tsu so the recursive call knows about -b
-    if [ "$(id -u)" != "0" ]; then 
-        OPTS=""
-        if [ "$BIND_HOST" = true ]; then OPTS="-b"; fi
-        $(realpath "$0") enter $OPTS $SANDBOX_NAME
-        exit $?
-    fi
+    # === Set Active ===
 
-    echo "[+] [ROOT] Entering sandbox: $SANDBOX_NAME"
+    # 1. Lock File Logic
+    local LOCK_FILE="$SANDBOX_BASE/.active"
+    
+    if [ -f "$LOCK_FILE" ]; then
+        echo "[!] Warning: Sandbox appears to be active (Lock file exists)."
+        echo "    If you are sure it is not running, run: rm \"$LOCK_FILE\""
+    fi
+    
+    # Mark as active
+    touch "$LOCK_FILE"
+
+    # 2. Cleanup Trap (Updated to remove lock file)
+    cleanup_action() {
+        # Prevent interruption during cleanup
+        trap '' EXIT INT TERM
+        
+        # Remove lock file
+        rm -f "$LOCK_FILE"
+        
+        # Remove temp files used for namespace init
+        rm -f "$SANDBOX_BASE/busybox_static_internal" "$SANDBOX_BASE/entry.sh" "$SANDBOX_BASE/.ns_init.sh"
+    }
+    # Register the trap immediately
+    trap cleanup_action EXIT INT TERM
+    # ====================================================================
+
+    echo "[+] Entering sandbox: $SANDBOX_NAME"
     if [ "$BIND_HOST" = true ]; then
         echo "    Mode: UNRESTRICTED (Host Mounted)"
     else
         echo "    Mode: SAFE (Isolated)"
     fi
 
-    # Pre-define variables for cleanup
-    CHROOT_ROOT="$SANDBOX_BASE"
-    MOUNT_BIN="/system/bin/mount"
-
-    # ================= SAFETY TRAP =================
-    # Define cleanup function: will be executed regardless of exit (crash, Ctrl+C, or success)
-    cleanup_mounts() {
-        # Prevent interruption during cleanup
-        trap '' EXIT INT TERM
-        
-        # Uncomment the next line if you want to see cleanup logs
-        # echo "[*] Cleaning up mounts..."
-        
-        # Unmount mount points in reverse order (sort -r ensures subdirectories are unmounted first)
-        grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
-        
-        # Delete temporary files
-        rm -f "$CHROOT_ROOT/busybox_static" "$CHROOT_ROOT/entry.sh"
-    }
-
-    # Register signal traps: EXIT (normal exit), INT (Ctrl+C), TERM (termination signal)
-    trap cleanup_mounts EXIT INT TERM
-    # ===============================================
-
-    REPO_IP=$(resolve_ip "$TARGET_DOMAIN")
+    local REPO_IP=$(resolve_ip "$TARGET_DOMAIN")
     [ -z "$REPO_IP" ] && REPO_IP="104.21.57.147"
-    DNS_SERVER=$(check_dns)
+    local DNS_SERVER=$(check_dns)
     
-    SOURCES_LIST="$SANDBOX_BASE/data/data/com.termux/files/usr/etc/apt/sources.list"
-    echo "deb https://$TARGET_DOMAIN/apt/termux-main stable main" > "$SOURCES_LIST"
-    rm -f "$SANDBOX_BASE/data/data/com.termux/files/usr/etc/apt/apt.conf.d/99-trust-all"
-
-    cp "$SANDBOX_BASE/busybox-static" "$CHROOT_ROOT/busybox_static"
-    chmod 755 "$CHROOT_ROOT/busybox_static"
-
-    # === BASE SYSTEM MOUNTS (Essential) ===
-    # Mount necessary directories for the sandbox OS to function
-    ABS_BASE=$(realpath "$HOME/.termux-sandbox")
+    # Calculate absolute path
+    local ABS_SANDBOX_BASE=$(realpath "$SANDBOX_BASE")
     
-    for item in /*; do
-        name=$(basename "$item")
-        ABS_ITEM=$(realpath "$item")
-        if [[ "$ABS_BASE" == "$ABS_ITEM"* ]]; then
-            continue
-        fi
-        [[ "$name" == "etc" ]] && continue
-        
-        # Skip sensitive directories here.
-        # They will be handled later in the OPTIONAL section based on flags.
-        case "$name" in
-            sdcard|storage|host_root) continue ;; 
-        esac
-        
-        if [ -L "$item" ]; then
-            target=$(readlink "$item")
-            rm -f "$CHROOT_ROOT/$name"
-            ln -sf "$target" "$CHROOT_ROOT/$name"
-        elif [ -d "$item" ]; then
-            case "$name" in
-                data|mnt|dev|proc|sys) ;; 
-                *)
-                    mkdir -p "$CHROOT_ROOT/$name"
-                    $MOUNT_BIN --rbind "$item" "$CHROOT_ROOT/$name" ;;
-            esac
-        fi
-    done
+    # Define the initialization script path
+    local INIT_SCRIPT="$SANDBOX_BASE/.ns_init.sh"
 
-    mkdir -p "$CHROOT_ROOT/dev" "$CHROOT_ROOT/proc" "$CHROOT_ROOT/sys"
-    $MOUNT_BIN --bind /dev "$CHROOT_ROOT/dev"
-    $MOUNT_BIN --bind /dev/pts "$CHROOT_ROOT/dev/pts"
-    $MOUNT_BIN --bind /proc "$CHROOT_ROOT/proc"
-    $MOUNT_BIN --bind /sys "$CHROOT_ROOT/sys"
+    # === GENERATE NAMESPACE INIT SCRIPT ===
+    # We write to a file instead of using <<EOF pipe to keep STDIN open for the shell
+    cat > "$INIT_SCRIPT" <<EOF
+#!/data/data/com.termux/files/usr/bin/bash
+
+# --- INSIDE ISOLATED NAMESPACE ---
+
+CHROOT_ROOT="$SANDBOX_BASE"
+MOUNT_BIN="/system/bin/mount"
+
+# Prepare busybox
+cp "\$CHROOT_ROOT/busybox-static" "\$CHROOT_ROOT/busybox_static_internal"
+chmod 755 "\$CHROOT_ROOT/busybox_static_internal"
+
+# === 1. Base System Mounts ===
+for item in /*; do
+    name=\$(basename "\$item")
+    case "\$name" in sdcard|storage|host_root|etc) continue ;; esac
     
-    mkdir -p "$CHROOT_ROOT/system"
-    $MOUNT_BIN --rbind /system "$CHROOT_ROOT/system"
-
-    # === OPTIONAL HOST MOUNTS ===
-    if [ "$BIND_HOST" = true ]; then
-        # Only execute if -b / --bind is passed
-        
-        # --- 1. HOST ROOT ---
-        # Strategy: Use tmpfs to avoid creating folders on real partition
-        mkdir -p "$CHROOT_ROOT/host_root"
-        $MOUNT_BIN -t tmpfs tmpfs "$CHROOT_ROOT/host_root"
-        
-        # echo "[*] Mirroring Host Root..."
-        for item in /*; do
-            name=$(basename "$item")
-            if [ -d "$item" ]; then
-                mkdir -p "$CHROOT_ROOT/host_root/$name"
-                $MOUNT_BIN --rbind "$item" "$CHROOT_ROOT/host_root/$name"
-            fi
-        done
-        
-        # --- 2. SDCARD ---
-        rm -rf "$CHROOT_ROOT/sdcard"
-        mkdir -p "$CHROOT_ROOT/sdcard"
-        if [ -d "/data/media/0" ]; then
-            $MOUNT_BIN --bind "/data/media/0" "$CHROOT_ROOT/sdcard"
-        else
-            $MOUNT_BIN --bind "/sdcard" "$CHROOT_ROOT/sdcard"
-        fi
-    else
-        # Safe Mode: Ensure these directories are empty or non-existent
-        rm -rf "$CHROOT_ROOT/sdcard" "$CHROOT_ROOT/host_root"
+    # Recursive check
+    abs_item=\$(realpath "\$item")
+    if [[ "$ABS_SANDBOX_BASE" == "\$abs_item"* ]]; then continue; fi
+    
+    if [ -L "\$item" ]; then
+        target=\$(readlink "\$item")
+        rm -f "\$CHROOT_ROOT/\$name"
+        ln -sf "\$target" "\$CHROOT_ROOT/\$name"
+    elif [ -d "\$item" ]; then
+        if [ ! -d "\$CHROOT_ROOT/\$name" ]; then mkdir -p "\$CHROOT_ROOT/\$name"; fi
+        \$MOUNT_BIN --rbind "\$item" "\$CHROOT_ROOT/\$name"
     fi
-    # ========================================
+done
 
-    # === ETC & NETWORKING ===
-    $MOUNT_BIN -t tmpfs tmpfs "$CHROOT_ROOT/system/etc"
-    echo "127.0.0.1 localhost" > "$CHROOT_ROOT/system/etc/hosts"
-    echo "$REPO_IP $TARGET_DOMAIN" >> "$CHROOT_ROOT/system/etc/hosts"
-    echo "nameserver $DNS_SERVER" > "$CHROOT_ROOT/system/etc/resolv.conf"
-    
-    chmod 755 "$CHROOT_ROOT/system/etc"
-    chmod 644 "$CHROOT_ROOT/system/etc/hosts"
-    
-    [ -d "/system/etc/security" ] && { mkdir -p "$CHROOT_ROOT/system/etc/security"; $MOUNT_BIN --bind "/system/etc/security" "$CHROOT_ROOT/system/etc/security"; }
-    
-    mkdir -p "$CHROOT_ROOT/etc"
-    echo "root:x:0:0:root:/root:/bin/sh" > "$CHROOT_ROOT/etc/passwd"
-    echo "termux:x:10000:10000:Termux User:/data/data/com.termux/files/home:/data/data/com.termux/files/usr/bin/bash" >> "$CHROOT_ROOT/etc/passwd"
-    echo "root:x:0:" > "$CHROOT_ROOT/etc/group"
-    echo "termux:x:10000:" >> "$CHROOT_ROOT/etc/group"
-    
-    cp "$CHROOT_ROOT/system/etc/resolv.conf" "$CHROOT_ROOT/etc/resolv.conf"
-    cp "$CHROOT_ROOT/system/etc/hosts" "$CHROOT_ROOT/etc/hosts"
+# Essential Kernel Mounts
+mkdir -p "\$CHROOT_ROOT/dev" "\$CHROOT_ROOT/proc" "\$CHROOT_ROOT/sys"
+\$MOUNT_BIN --bind /dev "\$CHROOT_ROOT/dev"
+\$MOUNT_BIN --bind /dev/pts "\$CHROOT_ROOT/dev/pts"
+\$MOUNT_BIN --bind /proc "\$CHROOT_ROOT/proc"
+\$MOUNT_BIN --bind /sys "\$CHROOT_ROOT/sys"
 
-    cat > "$CHROOT_ROOT/entry.sh" <<EOF
-#!/busybox_static sh
+mkdir -p "\$CHROOT_ROOT/system"
+\$MOUNT_BIN --rbind /system "\$CHROOT_ROOT/system"
+
+# === 2. Optional Host Mounts ===
+if [ "$BIND_HOST" = true ]; then
+    mkdir -p "\$CHROOT_ROOT/host_root"
+    \$MOUNT_BIN -t tmpfs tmpfs "\$CHROOT_ROOT/host_root"
+    for item in /*; do
+        [ -d "\$item" ] && { mkdir -p "\$CHROOT_ROOT/host_root/\$(basename \$item)"; \$MOUNT_BIN --rbind "\$item" "\$CHROOT_ROOT/host_root/\$(basename \$item)"; }
+    done
+    
+    rm -rf "\$CHROOT_ROOT/sdcard"
+    mkdir -p "\$CHROOT_ROOT/sdcard"
+    if [ -d "/data/media/0" ]; then 
+        \$MOUNT_BIN --bind "/data/media/0" "\$CHROOT_ROOT/sdcard"
+    else 
+        \$MOUNT_BIN --bind "/sdcard" "\$CHROOT_ROOT/sdcard"
+    fi
+else
+    rm -rf "\$CHROOT_ROOT/sdcard" "\$CHROOT_ROOT/host_root"
+fi
+
+# === 3. Networking & Config ===
+# MOUNT tmpfs FIRST, then write files!
+\$MOUNT_BIN -t tmpfs tmpfs "\$CHROOT_ROOT/system/etc"
+
+echo "127.0.0.1 localhost" > "\$CHROOT_ROOT/system/etc/hosts"
+echo "$REPO_IP $TARGET_DOMAIN" >> "\$CHROOT_ROOT/system/etc/hosts"
+echo "nameserver $DNS_SERVER" > "\$CHROOT_ROOT/system/etc/resolv.conf"
+
+chmod 755 "\$CHROOT_ROOT/system/etc"
+chmod 644 "\$CHROOT_ROOT/system/etc/hosts"
+
+[ -d "/system/etc/security" ] && { mkdir -p "\$CHROOT_ROOT/system/etc/security"; \$MOUNT_BIN --bind "/system/etc/security" "\$CHROOT_ROOT/system/etc/security"; }
+
+mkdir -p "\$CHROOT_ROOT/etc"
+echo "root:x:0:0:root:/root:/bin/sh" > "\$CHROOT_ROOT/etc/passwd"
+echo "termux:x:10000:10000:Termux User:/data/data/com.termux/files/home:/data/data/com.termux/files/usr/bin/bash" >> "\$CHROOT_ROOT/etc/passwd"
+echo "root:x:0:" > "\$CHROOT_ROOT/etc/group"
+echo "termux:x:10000:" >> "\$CHROOT_ROOT/etc/group"
+
+cp "\$CHROOT_ROOT/system/etc/resolv.conf" "\$CHROOT_ROOT/etc/resolv.conf"
+cp "\$CHROOT_ROOT/system/etc/hosts" "\$CHROOT_ROOT/etc/hosts"
+
+# Update apt source inside (just to be safe)
+echo "deb https://$TARGET_DOMAIN/apt/termux-main stable main" > "\$CHROOT_ROOT/data/data/com.termux/files/usr/etc/apt/sources.list"
+rm -f "\$CHROOT_ROOT/data/data/com.termux/files/usr/etc/apt/apt.conf.d/99-trust-all"
+
+# Create Entry Script
+cat > "\$CHROOT_ROOT/entry.sh" <<ENTRY
+#!/busybox_static_internal sh
 TERMUX_USR="/data/data/com.termux/files/usr"
-TERMUX_BASH="\$TERMUX_USR/bin/bash"
-export PATH=/busybox_static:\$TERMUX_USR/bin:/system/bin
+TERMUX_BASH="\\\$TERMUX_USR/bin/bash"
+export PATH="/busybox_static_internal:\\\$TERMUX_USR/bin:/system/bin"
 export HOME="/data/data/com.termux/files/home"
 export TERM=xterm-256color
-export TMPDIR=\$TERMUX_USR/tmp
-export SSL_CERT_FILE=\$TERMUX_USR/etc/tls/cert.pem
+export TMPDIR=\\\$TERMUX_USR/tmp
+export SSL_CERT_FILE=\\\$TERMUX_USR/etc/tls/cert.pem
 export SSL_CERT_DIR=/system/etc/security/cacerts
-FAKE_LIB="\$TERMUX_USR/lib/libfakeuid.so"
+FAKE_LIB="\\\$TERMUX_USR/lib/libfakeuid.so"
 
 echo "----------------------------------------"
-echo "[*] Sandbox: $SANDBOX_NAME"
 if [ "$BIND_HOST" = true ]; then
     echo "WARNING: /sdcard and /host_root are ACCESSIBLE."
 else
@@ -346,56 +342,61 @@ else
 fi
 echo "----------------------------------------"
 
-if [ -x "\$TERMUX_BASH" ]; then
-    export LD_PRELOAD="\$FAKE_LIB"
-    exec \$TERMUX_BASH -l
+if [ -x "\\\$TERMUX_BASH" ]; then
+    export LD_PRELOAD="\\\$FAKE_LIB"
+    # -l: Make it a login shell
+    # -i: Force interactive mode (Critical to prevent exit on stdin issues)
+    exec \\\$TERMUX_BASH -l
 else
-    exec /busybox_static sh
+    exec /busybox_static_internal sh
 fi
-EOF
-    chmod 755 "$CHROOT_ROOT/entry.sh"
+ENTRY
 
-    chroot "$CHROOT_ROOT" /busybox_static sh /entry.sh
+chmod 755 "\$CHROOT_ROOT/entry.sh"
+
+# Enter Chroot
+chroot "\$CHROOT_ROOT" /busybox_static_internal sh /entry.sh
+EOF
+
+    # Make the init script executable
+    chmod +x "$INIT_SCRIPT"
+
+    # Execute unshare using the script file
+    # This keeps STDIN free for the interactive shell!
+    unshare --mount --propagation private bash "$INIT_SCRIPT"
+
+    # Cleanup
+    rm -f "$LOCK_FILE"
+    rm -f "$SANDBOX_BASE/busybox_static_internal" "$SANDBOX_BASE/entry.sh" "$INIT_SCRIPT"
+    trap - EXIT INT TERM
 }
 
 cmd_delete() {
-    # 1. Root privilege check
-    if [ "$(id -u)" != "0" ]; then $(realpath "$0") delete $SANDBOX_NAME; exit $?; fi
-    
-    # 2. Check if the sandbox directory exists
+    # 1. Check if the sandbox directory exists
     if [ ! -d "$SANDBOX_BASE" ]; then
         echo "[!] Sandbox '$SANDBOX_NAME' not found."
         return
     fi
 
-    echo "[*] Deleting sandbox: $SANDBOX_NAME"
-
-    # 3. Attempt to unmount filesystems (multiple tries to ensure stubborn mounts are detached)
-    # Loop 3 times to prevent lazy unmount from being incomplete
-    for i in 1 2 3; do
-        if grep -q "$SANDBOX_BASE" /proc/mounts; then
-            echo "    - Unmounting filesystems (Attempt $i)..."
-            grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
-            sleep 0.5
-        else
-            break
-        fi
-    done
-
-    # 4. [CRITICAL SAFETY CHECK] Re-check for any remaining mounts
-    # If grep still finds the sandbox path, it means unmounting failed.
-    # ABSOLUTELY DO NOT EXECUTE rm -rf AT THIS POINT!!!
-    if grep -q "$SANDBOX_BASE" /proc/mounts; then
-        echo " "
-        echo "❌ [CRITICAL ERROR] Unmount failed!"
-        echo "  Filesystem is still mounted. Aborting delete to protect host data."
-        echo "  Please close all sandbox sessions and try again."
-        echo "  Debug: check 'cat /proc/mounts | grep $SANDBOX_NAME'"
-        exit 1
+    # 2. Check if the sandbox is currently active
+    # We must prevent deletion while the sandbox is in use to avoid I/O errors.
+    # Note: We use the lock file check because 'grep /proc/mounts' no longer works 
+    # with private namespaces.
+    if is_active "$SANDBOX_NAME"; then
+        echo "[!] Sandbox is currently active (Lock file exists)."
+        echo "    Please exit the sandbox first."
+        return
     fi
 
-    # 5. Only execute deletion after confirming no mounts remain
+    echo "[*] Deleting sandbox: $SANDBOX_NAME"
+    
+    # 3. Delete directory directly
+    # Safety Note: Since we use Private Mount Namespaces (unshare), the mount points
+    # inside the sandbox are NOT visible to the host system.
+    # Therefore, 'rm -rf' will simply delete the directory structure and will NOT
+    # recursively delete host files (like /sdcard or /system), making it safe.
     rm -rf "$SANDBOX_BASE"
+    
     echo "[+] Sandbox deleted successfully."
 }
 
@@ -425,7 +426,7 @@ cmd_rename() {
 
     # 3. SAFETY CHECK: Ensure sandbox is not active
     # Renaming a directory that has active mounts is dangerous and causes system confusion
-    if grep -q "$OLD_DIR" /proc/mounts; then
+    if is_active "$OLD_NAME"; then
         echo "[!] Sandbox is active. Please exit/stop it first before renaming."
         return
     fi
@@ -467,7 +468,7 @@ cmd_duplicate() {
     # 3. SAFETY CHECK: Ensure source is not active
     # Duplicating an active sandbox would recursively copy /sdcard and /host_root contents
     # causing storage exhaustion and infinite loops.
-    if grep -q "$SRC_DIR" /proc/mounts; then
+    if is_active "$SRC_NAME"; then
         echo "[!] Sandbox is active. Please exit/stop it first before duplicating."
         return
     fi
@@ -509,7 +510,7 @@ cmd_export() {
     fi
 
     # Check if sandbox is currently active (must stop before export)
-    if grep -q "$SANDBOX_DIR" /proc/mounts; then
+    if is_active "$TARGET_NAME"; then
         echo "[!] Sandbox is active. Please exit/stop it first."
         return
     fi
@@ -587,28 +588,24 @@ cmd_import() {
 cmd_list() {
     BASE_DIR="$HOME/.termux-sandbox"
     
-    # Check if the base directory exists
     if [ ! -d "$BASE_DIR" ]; then
-        echo "[!] No sandboxes found, or tsu environment not detected."
+        echo "[!] No sandboxes found."
         return
     fi
 
-    # Table header format
     echo
     printf "%-20s | %-10s\n" "SANDBOX NAME" "STATUS"
     echo "---------------------+-----------"
 
     found=0
     for dir in "$BASE_DIR"/*; do
-        # Skip non-directories (e.g., bootstrap.zip)
         [ ! -d "$dir" ] && continue
         
         name=$(basename "$dir")
         found=1
         
-        # Check if mounted (to determine if the sandbox is running)
-        # If the sandbox path is found in /proc/mounts, it means it hasn't been unmounted yet
-        if grep -q "$dir" /proc/mounts; then
+        # Modified check: Look for lock file instead of mounts
+        if [ -f "$dir/.active" ]; then
             status="🟢 Active"
         else
             status="⚪ Idle"
