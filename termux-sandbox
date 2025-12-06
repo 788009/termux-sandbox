@@ -394,6 +394,95 @@ cmd_delete() {
     echo "[+] Sandbox deleted successfully."
 }
 
+cmd_rename() {
+    local OLD_NAME="$1"
+    local NEW_NAME="$2"
+
+    if [ -z "$OLD_NAME" ] || [ -z "$NEW_NAME" ]; then
+        echo "Usage: $(basename "$0") rename <old_name> <new_name>"
+        return
+    fi
+
+    local OLD_DIR="$HOME/.termux-sandbox/$OLD_NAME"
+    local NEW_DIR="$HOME/.termux-sandbox/$NEW_NAME"
+
+    # 1. Check if source exists
+    if [ ! -d "$OLD_DIR" ]; then
+        echo "[!] Sandbox '$OLD_NAME' not found."
+        return
+    fi
+
+    # 2. Check if target already exists
+    if [ -d "$NEW_DIR" ]; then
+        echo "[!] A sandbox named '$NEW_NAME' already exists."
+        return
+    fi
+
+    # 3. SAFETY CHECK: Ensure sandbox is not active
+    # Renaming a directory that has active mounts is dangerous and causes system confusion
+    if grep -q "$OLD_DIR" /proc/mounts; then
+        echo "[!] Sandbox is active. Please exit/stop it first before renaming."
+        return
+    fi
+
+    echo "[*] Renaming '$OLD_NAME' to '$NEW_NAME'..."
+    mv "$OLD_DIR" "$NEW_DIR"
+    
+    if [ $? -eq 0 ]; then
+        echo "[+] Rename successful."
+    else
+        echo "[!] Rename failed."
+    fi
+}
+
+cmd_duplicate() {
+    local SRC_NAME="$1"
+    local NEW_NAME="$2"
+
+    if [ -z "$SRC_NAME" ] || [ -z "$NEW_NAME" ]; then
+        echo "Usage: $(basename "$0") duplicate <source_name> <new_name>"
+        return
+    fi
+
+    local SRC_DIR="$HOME/.termux-sandbox/$SRC_NAME"
+    local NEW_DIR="$HOME/.termux-sandbox/$NEW_NAME"
+
+    # 1. Check if source exists
+    if [ ! -d "$SRC_DIR" ]; then
+        echo "[!] Source sandbox '$SRC_NAME' not found."
+        return
+    fi
+
+    # 2. Check if target already exists
+    if [ -d "$NEW_DIR" ]; then
+        echo "[!] A sandbox named '$NEW_NAME' already exists."
+        return
+    fi
+
+    # 3. SAFETY CHECK: Ensure source is not active
+    # Duplicating an active sandbox would recursively copy /sdcard and /host_root contents
+    # causing storage exhaustion and infinite loops.
+    if grep -q "$SRC_DIR" /proc/mounts; then
+        echo "[!] Sandbox is active. Please exit/stop it first before duplicating."
+        return
+    fi
+
+    echo "[*] Duplicating '$SRC_NAME' to '$NEW_NAME'..."
+    echo "    This may take a while depending on the size..."
+
+    # -p: Preserve mode, ownership, and timestamps (Critical for rootfs)
+    # -r: Recursive copy
+    cp -p -r "$SRC_DIR" "$NEW_DIR"
+
+    if [ $? -eq 0 ]; then
+        echo "[+] Duplicate successful."
+    else
+        echo "[!] Duplicate failed."
+        # Cleanup partial copy if failed
+        rm -rf "$NEW_DIR"
+    fi
+}
+
 cmd_export() {
     local TARGET_NAME="$1"
     local OUTPUT_FILE="$2"
@@ -530,17 +619,21 @@ cmd_list() {
 }
 
 case "$1" in
-    create) shift; cmd_create "$@" ;;
-    enter)  shift; cmd_enter "$@"  ;;
-    delete) shift; cmd_delete "$@" ;;
-    export) shift; cmd_export "$@" ;;
-    import) shift; cmd_import "$@" ;;
-    list)   cmd_list ;;
+    create)    shift; cmd_create "$@" ;;
+    enter)     shift; cmd_enter "$@"  ;;
+    delete)    shift; cmd_delete "$@" ;;
+    rename)    shift; cmd_rename "$@" ;;
+    duplicate) shift; cmd_duplicate "$@" ;;
+    export)    shift; cmd_export "$@" ;;
+    import)    shift; cmd_import "$@" ;;
+    list)      cmd_list ;;
     *) 
         echo "Usage:"
         echo "  $(basename "$0") create [name]"
         echo "  $(basename "$0") enter [name] [--bind|-b]"
         echo "  $(basename "$0") delete [name]"
+        echo "  $(basename "$0") rename <old_name> <new_name>"
+        echo "  $(basename "$0") duplicate <src_name> <new_name>"
         echo "  $(basename "$0") export <name> <file.tar.gz>"
         echo "  $(basename "$0") import <file.tar.gz>"
         echo "  $(basename "$0") list"
