@@ -274,9 +274,44 @@ EOF
 }
 
 cmd_delete() {
+    # 1. Root privilege check
     if [ "$(id -u)" != "0" ]; then tsu -c "$(realpath "$0") delete $SANDBOX_NAME"; exit $?; fi
-    grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
-    if [ -d "$SANDBOX_BASE" ]; then rm -rf "$SANDBOX_BASE"; echo "[+] Deleted."; else echo "[!] Sandbox not found."; fi
+    
+    # 2. Check if the sandbox directory exists
+    if [ ! -d "$SANDBOX_BASE" ]; then
+        echo "[!] Sandbox '$SANDBOX_NAME' not found."
+        return
+    fi
+
+    echo "[*] Deleting sandbox: $SANDBOX_NAME"
+
+    # 3. Attempt to unmount filesystems (multiple tries to ensure stubborn mounts are detached)
+    # Loop 3 times to prevent lazy unmount from being incomplete
+    for i in 1 2 3; do
+        if grep -q "$SANDBOX_BASE" /proc/mounts; then
+            echo "    - Unmounting filesystems (Attempt $i)..."
+            grep "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | xargs -r umount -l 2>/dev/null
+            sleep 0.5
+        else
+            break
+        fi
+    done
+
+    # 4. [CRITICAL SAFETY CHECK] Re-check for any remaining mounts
+    # If grep still finds the sandbox path, it means unmounting failed.
+    # ABSOLUTELY DO NOT EXECUTE rm -rf AT THIS POINT!!!
+    if grep -q "$SANDBOX_BASE" /proc/mounts; then
+        echo " "
+        echo "❌ [CRITICAL ERROR] Unmount failed!"
+        echo "⚠️  Filesystem is still mounted. Aborting delete to protect host data."
+        echo "ℹ️  Please close all sandbox sessions and try again."
+        echo "    Debug: check 'cat /proc/mounts | grep $SANDBOX_NAME'"
+        exit 1
+    fi
+
+    # 5. Only execute deletion after confirming no mounts remain
+    rm -rf "$SANDBOX_BASE"
+    echo "[+] Sandbox deleted successfully."
 }
 
 cmd_list() {
