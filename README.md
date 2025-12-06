@@ -132,13 +132,10 @@ termux-sandbox delete
 termux-sandbox delete mysandbox
 ```
 
-**CRITICAL WARNING: READ BEFORE DELETING**
- 
-1.  **ALWAYS use the `termux-sandbox delete` command.**
-2.  **NEVER manually delete** the sandbox directory (e.g., using `rm` or a file manager) while the > > > sandbox is active.
-      * *Why?* Even in Safe Mode, system directories (`/system`, `/dev`) are mounted. Deleting the folder manually will attempt to delete actual system files, which can **BRICK** your device or cause data loss.
-3.  **Uninstalling Termux?**
-      * Please **reboot your device** first. This guarantees that all sandbox mounts are disconnected before the Termux app data is wiped by Android.
+**Recommendation:**
+Always use the `termux-sandbox delete` command. This ensures that lock files and temporary scripts are cleaned up correctly.
+
+This tool uses Private Mount Namespaces. This means mounts created inside the sandbox are invisible to the host system. While manual deletion of the sandbox directory is safe, using the built-in delete command is still the preferred method to prevent state inconsistencies.
 
 ### Rename a sandbox
 
@@ -168,13 +165,12 @@ termux-sandbox import mysandbox.tar.gz
 
 ## Implementation Overview
 
-* **Mount namespaces** are used to isolate the environment while allowing selected host paths to be rebound.
+* **Private Mount Namespaces (`unshare`)** are used to isolate the file system hierarchy. Mounts created inside the sandbox are invisible to the host, preventing accidental host data loss during cleanup.
 * **Chroot** provides a minimal root filesystem based on the Termux bootstrap.
 * An **`LD_PRELOAD` library** overrides a small set of system calls to report a non-root UID, allowing `apt`, `pkg`, and other Termux tools to operate normally.
-* The design avoids modifying host Termux and keeps each sandbox self-contained.
 * **Network Namespace Sharing** allows the sandbox to use the host's network connection directly.
-* **Automatic DNS Configuration** generates a standard Linux `/etc/resolv.conf` (auto-detecting DNS connectivity), bypassing Android's specific DNS properties that often fail inside chroots.
-* When exporting and importing, APT caches will be automatically cleaned, and environment-irrelevant content such as `busybox`, `entry.sh`, and mount points will be excluded to minimize the export file size.
+* **Automatic DNS Configuration** generates a standard Linux `/etc/resolv.conf` by auto-detecting DNS connectivity, bypassing Android-specific DNS properties that often fail inside chroots.
+* **Smart Exporting**: When exporting, APT caches and runtime files (busybox, entry scripts, mount points) are automatically excluded to minimize the archive size.
 
 ## Credits
 

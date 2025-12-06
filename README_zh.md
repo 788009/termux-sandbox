@@ -133,13 +133,10 @@ termux-sandbox delete
 termux-sandbox delete mysandbox
 ```
 
-**警告：关于删除沙盒**
+**建议：**
+务必始终使用 `termux-sandbox delete` 命令。这能确保正确清理锁文件和临时脚本。
 
-1.  **永远使用 `termux-sandbox delete` 命令来删除沙盒。**
-2.  **切勿手动删除沙盒目录**（例如使用 `rm` 命令或文件管理器）。
-      * *为什么？* 即使在安全模式下，`/system` 和 `/dev` 等系统目录依然处于挂载状态。手动删除目录会直接尝试删除手机的真实系统文件，这会导致手机**变砖**或系统崩溃。
-3.  **关于卸载 Termux**
-      * 请务必先**重启手机**。重启是强制断开所有挂载的唯一绝对安全的方法，防止安卓系统在卸载清理数据时误删底层文件。
+本工具使用了私有挂载命名空间 (Private Mount Namespaces)。这意味着在沙盒内部创建的挂载点对宿主系统是不可见的。虽然手动删除沙盒目录可以认为安全，但仍推荐使用内置的 delete 命令，以防止状态不一致。
 
 ### 重命名沙盒
 
@@ -169,12 +166,11 @@ termux-sandbox import mysandbox.tar.gz
 
 ## 实现原理
 
-* 利用 **Mount namespaces**（挂载命名空间）隔离环境，同时允许将特定的宿主路径重新绑定 (rebind) 到沙盒内。
+* **私有挂载命名空间 (`unshare`)** 用于隔离文件系统层级。沙盒内创建的挂载点对宿主不可见，从而防止在清理过程中意外导致宿主数据丢失。
 * 利用 **Chroot** 提供基于 Termux bootstrap 的最小化根文件系统。
 * 利用 **`LD_PRELOAD` 库** 拦截并覆盖少量的系统调用，向应用程序报告非 Root UID，从而使 `apt`、`pkg` 等 Termux 工具能正常运行。
-* 该设计完全避免了修改宿主 Termux 环境，确保每个沙盒都是自包含的。
 * **共享网络命名空间** 允许沙盒直接复用宿主机的网络连接。
-* **自动 DNS 配置** 会生成标准的 Linux `/etc/resolv.conf`（自动检测 DNS 连通性），绕过了在 Chroot 环境中经常失效的 Android 特有 DNS 属性查询。
+* **自动 DNS 配置** 通过自动检测 DNS 连通性生成标准的 Linux `/etc/resolv.conf`，绕过了 Android 特有 DNS 属性在 Chroot 环境中经常失效的问题。
 * 导出和导入时，会自动清理 APT 缓存，以及排除 `busybox`、`entry.sh`、挂载点等环境无关内容，尽量减小导出体积。
 
 ## 致谢
