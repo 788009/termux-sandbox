@@ -9,6 +9,8 @@ BOOTSTRAP_VERSION="bootstrap-2025.11.30-r1%2Bapt.android-7"
 BOOTSTRAP_URL_ARM="https://github.com/termux/termux-packages/releases/download/${BOOTSTRAP_VERSION}/bootstrap-arm.zip"
 BOOTSTRAP_URL_AARCH64="https://github.com/termux/termux-packages/releases/download/${BOOTSTRAP_VERSION}/bootstrap-aarch64.zip"
 
+# Busybox configuration
+BUSYBOX_URL="https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64"
 BUSYBOX_PATH="$HOME/busybox_arm64"
 TARGET_DOMAIN="packages-cf.termux.dev"
 # ===============================================
@@ -26,6 +28,35 @@ find_busybox() {
     SCRIPT_DIR=$(dirname "$(realpath "$0")")
     if [ -f "$SCRIPT_DIR/busybox_arm64" ]; then echo "$SCRIPT_DIR/busybox_arm64"; return; fi
     return 1
+}
+
+# Check and automatically download Busybox if missing
+check_busybox() {
+    local EXIST_PATH=$(find_busybox)
+    
+    # If exists, return immediately
+    if [ -n "$EXIST_PATH" ]; then
+        return 0
+    fi
+
+    echo "[!] Busybox binary not found."
+    
+    # Architecture check (simple check to prevent downloading on non-arm64)
+    if [ "$ARCH" != "aarch64" ]; then
+        echo "[!] Warning: Auto-download is configured for aarch64. Your arch is $ARCH."
+    fi
+
+    echo "[+] Downloading Busybox from release..."
+    curl -L "$BUSYBOX_URL" -o "$BUSYBOX_PATH" --fail
+
+    if [ $? -ne 0 ]; then
+        echo "[!] Error: Failed to download Busybox. Please install it manually."
+        rm -f "$BUSYBOX_PATH"
+        exit 1
+    fi
+
+    chmod 755 "$BUSYBOX_PATH"
+    echo "[+] Busybox installed to $BUSYBOX_PATH"
 }
 
 restore_symlinks() {
@@ -79,9 +110,12 @@ cmd_create() {
     
     if [ -d "$TERMUX_USR/bin" ]; then echo "[!] Environment exists."; exit 0; fi
     
+    # Ensure Busybox is available
+    check_busybox
+    
     LOCAL_BUSYBOX=$(find_busybox)
     if [ -z "$LOCAL_BUSYBOX" ]; then 
-        echo "[!] Error: Busybox not found at $BUSYBOX_PATH"; exit 1
+        echo "[!] Error: Busybox not found even after download attempt."; exit 1
     fi
     
     echo "[+] Creating structure..."
@@ -158,9 +192,9 @@ cmd_enter() {
 
     echo "[+] [ROOT] Entering sandbox: $SANDBOX_NAME"
     if [ "$BIND_HOST" = true ]; then
-        echo "    ⚠️  Mode: UNRESTRICTED (Host Mounted)"
+        echo "    Mode: UNRESTRICTED (Host Mounted)"
     else
-        echo "    🛡️  Mode: SAFE (Isolated)"
+        echo "    Mode: SAFE (Isolated)"
     fi
 
     # Pre-define variables for cleanup
@@ -349,9 +383,9 @@ cmd_delete() {
     if grep -q "$SANDBOX_BASE" /proc/mounts; then
         echo " "
         echo "❌ [CRITICAL ERROR] Unmount failed!"
-        echo "⚠️  Filesystem is still mounted. Aborting delete to protect host data."
-        echo "ℹ️  Please close all sandbox sessions and try again."
-        echo "    Debug: check 'cat /proc/mounts | grep $SANDBOX_NAME'"
+        echo "  Filesystem is still mounted. Aborting delete to protect host data."
+        echo "  Please close all sandbox sessions and try again."
+        echo "  Debug: check 'cat /proc/mounts | grep $SANDBOX_NAME'"
         exit 1
     fi
 
