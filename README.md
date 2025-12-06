@@ -73,7 +73,7 @@ chmod 755 ~/.suroot/busybox_arm64
 
 **Requires `tsu` environment.**
 
-If no name is specified for the following commands, the actual name used will be `default`.
+If no name is specified for the `create`, `enter`, and `delete` commands, the actual name used will be `default`.
 
 ### Create a new sandbox
 
@@ -126,15 +126,15 @@ Once inside, the file system layout is standard Linux/Termux, with two special a
 | `/sdcard` | Direct access to your internal storage. |
 | `/host_root` | A **recursive mirror** of your real Android system. You can see `/data`, `/apex`, `/vendor` etc. inside here. |
 
-> **Warning:** You are **Root** inside the sandbox.
-> *   Deleting files in `/sdcard` deletes them from your phone.
-> *   Deleting files in `/host_root` **WILL BRICK** your phone.
+**Warning:** You are **Root** inside the sandbox.
+*   Deleting files in `/sdcard` deletes them from your phone.
+*   Deleting files in `/host_root` **WILL BRICK** your phone.
 
 ## Implementation Overview
 
 * **Mount namespaces** are used to isolate the environment while allowing selected host paths to be rebound.
 * **Chroot** provides a minimal root filesystem based on the Termux bootstrap.
-* An **LD_PRELOAD library** overrides a small set of system calls to report a non-root UID, allowing `apt`, `pkg`, and other Termux tools to operate normally.
+* An **`LD_PRELOAD` library** overrides a small set of system calls to report a non-root UID, allowing `apt`, `pkg`, and other Termux tools to operate normally.
 * The design avoids modifying host Termux and keeps each sandbox self-contained.
 
 ## Credits

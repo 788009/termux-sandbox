@@ -71,7 +71,7 @@ chmod 755 ~/.suroot/busybox_arm64
 
 **需要 `tsu` 环境**
 
-以下命令若未指定名称，则实际名称为 `default`。
+`create`、`enter` 和 `delete` 命令若未指定名称，则实际名称为 `default`。
 
 ### 创建新沙盒
 
@@ -120,16 +120,15 @@ termux-sandbox delete dev
 | `/sdcard` | 直接访问手机的内部存储。 |
 | `/host_root` | 真实 Android 系统的**递归镜像**。你可以在此查看到 `/data`, `/apex`, `/vendor` 等目录。 |
 
-> **警告：** 你在沙盒内拥有 **Root** 权限。
->
->   * 删除 `/sdcard` 中的文件会将其从手机中彻底删除。
->   * 删除 `/host_root` 中的文件**会导致手机变砖**。
+**警告：** 你在沙盒内拥有 **Root** 权限。
+* 删除 `/sdcard` 中的文件会将其从手机中彻底删除。
+* 删除 `/host_root` 中的文件**会导致手机变砖**。
 
 ## 实现原理
 
   * 利用 **Mount namespaces**（挂载命名空间）隔离环境，同时允许将特定的宿主路径重新绑定 (rebind) 到沙盒内。
   * 利用 **Chroot** 提供基于 Termux bootstrap 的最小化根文件系统。
-  * 利用 **LD\_PRELOAD 库** 拦截并覆盖少量的系统调用，向应用程序报告非 Root UID，从而使 `apt`、`pkg` 等 Termux 工具能正常运行。
+  * 利用 **`LD_PRELOAD` 库** 拦截并覆盖少量的系统调用，向应用程序报告非 Root UID，从而使 `apt`、`pkg` 等 Termux 工具能正常运行。
   * 该设计完全避免了修改宿主 Termux 环境，确保每个沙盒都是自包含的。
 
 ## 致谢
