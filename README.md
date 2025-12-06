@@ -80,7 +80,7 @@ If no name is specified for the `create`, `enter`, and `delete` commands, the ac
 ```bash
 termux-sandbox create
 # or with name
-termux-sandbox create dev
+termux-sandbox create mysandbox
 ```
 
 ### Enter a sandbox (two modes)
@@ -92,7 +92,7 @@ By default, the sandbox is isolated. It cannot see your SD card or host system f
 ```bash
 termux-sandbox enter
 # or with name
-termux-sandbox enter dev
+termux-sandbox enter mysandbox
 ```
 
 #### 2. Unrestricted mode (advanced)
@@ -102,7 +102,7 @@ Use the `-b` or `--bind` flag to mount host directories (`/sdcard` and `/host_ro
 ```bash
 termux-sandbox enter -b
 # or with name
-termux-sandbox enter -b dev
+termux-sandbox enter -b mysandbox
 ```
 
 **Warning for Unrestricted Mode:**
@@ -126,7 +126,7 @@ termux-sandbox list
 ```bash
 termux-sandbox delete
 # or with name
-termux-sandbox delete dev
+termux-sandbox delete mysandbox
 ```
 
 **CRITICAL WARNING: READ BEFORE DELETING**
@@ -152,13 +152,13 @@ termux-sandbox duplicate mysandbox mysandbox2
 ### Export a sandbox
 
 ```bash
-termux-sandbox export <name> <file.tar.gz>
+termux-sandbox export mysandbox mysandbox.tar.gz
 ```
 
 ### Import a sandbox
 
 ```bash
-termux-sandbox import <file.tar.gz>
+termux-sandbox import mysandbox.tar.gz
 ```
 
 </details>
