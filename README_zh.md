@@ -1,6 +1,6 @@
 # Termux Sandbox
 
-Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具备原生性能**的 Termux 环境。
+Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具备原生性能**的 Termux 环境。  
 该工具专为脚本测试、软件编译或维持主环境整洁而设计，无需依赖 `proot` 或容器运行时。
 
 ![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
@@ -16,26 +16,25 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
 
 ## 特性
 
-  - **原生执行**
+  - **原生执行**  
     直接在系统上运行，无模拟或 `proot` 开销，性能零损耗。
 
-  - **独立环境**
+  - **独立环境**  
     支持创建多个相互独立的沙盒，便于区分不同的项目或实验。
 
-  - **Root 权限适配**
+  - **Root 权限适配**  
     内置 UID 伪装机制，确保 `apt`、`pkg` 等 Termux 软件包在真实的 Root 权限下也能正常运行。
 
   - **宿主资源映射**
-
       - `/sdcard` – 直接访问内部存储。
       - `/host_root` – 完整映射 Android 根文件系统（System, Data, Apex 等）。
 
-  - **无侵入设计**
+  - **无侵入设计**  
     沙盒保持极简与隔离，除非显式操作，否则绝不修改或污染原本的 Termux 环境。
 
 ## 需求
 
-  - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU；其他方案可能兼容）。
+  - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU；其他方案不保证）。
   - ARM64 (aarch64) 架构。
   - 已安装 Termux 应用。
   - BusyBox 静态二进制文件（下方提供）。
@@ -66,7 +65,7 @@ chmod 755 ~/.suroot/busybox_arm64
 
 ## 使用方法
 
-**要求 `tsu` 环境**
+**需要 `tsu` 环境**
 
 ### 创建新沙盒
 
