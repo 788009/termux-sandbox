@@ -26,15 +26,18 @@ It is designed for testing scripts, building software, or keeping the main envir
 - **Independent Environments**  
   Create multiple sandboxes for different projects or experiments.
 
+- **Safe Defaults**  
+  The sandbox starts minimal and does not modify the host Termux installation unless explicitly invoked.
+
 - **Root-Aware Userspace**  
   Includes a preloadable UID shim to allow Termux packages to operate correctly under real root privileges.
+
+- **Seamless Networking**  
+  Out-of-the-box internet access. Automatically configures DNS (`resolv.conf`) and network interfaces, so tools like `pkg`, `pip`, and `git` work immediately without manual host patching.
 
 - **Host Access**
   - **Safe mode (default):** No access to `/sdcard` or the host Android system.
   - **Unrestricted mode:** Optional flags to map `/sdcard` and `/host_root` for advanced tasks.
-
-- **Safe Defaults**  
-  The sandbox starts minimal and does not modify the host Termux installation unless explicitly invoked.
 
 - **Duplicate, Export, and Import**
   Allows for easy sandbox duplication, backup (exporting), and environment recovery/sharing (importing), significantly streamlining setup and maintenance.
@@ -169,6 +172,8 @@ termux-sandbox import mysandbox.tar.gz
 * **Chroot** provides a minimal root filesystem based on the Termux bootstrap.
 * An **`LD_PRELOAD` library** overrides a small set of system calls to report a non-root UID, allowing `apt`, `pkg`, and other Termux tools to operate normally.
 * The design avoids modifying host Termux and keeps each sandbox self-contained.
+* **Network Namespace Sharing** allows the sandbox to use the host's network connection directly.
+* **Automatic DNS Configuration** generates a standard Linux `/etc/resolv.conf` (auto-detecting DNS connectivity), bypassing Android's specific DNS properties that often fail inside chroots.
 * When exporting and importing, APT caches will be automatically cleaned, and environment-irrelevant content such as `busybox`, `entry.sh`, and mount points will be excluded to minimize the export file size.
 
 ## Credits

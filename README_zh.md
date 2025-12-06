@@ -18,31 +18,34 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
 
 ## 特性
 
-  - **原生执行**  
-    直接在系统上运行，无模拟或 `proot` 开销，性能零损耗。
+- **原生执行**  
+  直接在系统上运行，无模拟或 `proot` 开销，性能零损耗。
 
-  - **独立环境**  
-    支持创建多个相互独立的沙盒，便于区分不同的项目或实验。
+- **独立环境**  
+  支持创建多个相互独立的沙盒，便于区分不同的项目或实验。
 
-  - **Root 权限适配**  
-    内置 UID 伪装机制，确保 `apt`、`pkg` 等 Termux 软件包在真实的 Root 权限下也能正常运行。
+- **无侵入设计**  
+  沙盒保持极简与隔离，除非显式操作，否则绝不修改或污染原本的 Termux 环境。
 
-  - **宿主资源映射**
-    - **安全模式（默认）：** 无法访问 `/sdcard` 或宿主 Android 系统文件。
-    - **无限制模式：** 可通过参数开启 `/sdcard` 和 `/host_root` 的完整映射。
+- **Root 权限适配**  
+  内置 UID 伪装机制，确保 `apt`、`pkg` 等 Termux 软件包在真实的 Root 权限下也能正常运行。
 
-  - **无侵入设计**  
-    沙盒保持极简与隔离，除非显式操作，否则绝不修改或污染原本的 Termux 环境。
+- **网络连接**  
+  开箱即用的网络连接。自动配置 DNS (`resolv.conf`) 和网络接口，确保 `pkg`、`pip` 和 `git` 等工具无需手动修补 host 即可直接工作。
 
-  - **复制、导出与导入**
-    支持沙盒的复制、备份（导出），以及环境恢复与共享（导入），大幅简化了环境的配置和维护流程。
+- **宿主资源映射**
+  - **安全模式（默认）：** 无法访问 `/sdcard` 或宿主 Android 系统文件。
+  - **无限制模式：** 可通过参数开启 `/sdcard` 和 `/host_root` 的完整映射。
+
+- **复制、导出与导入**
+  支持沙盒的复制、备份（导出），以及环境恢复与共享（导入），大幅简化了环境的配置和维护流程。
 
 ## 要求
 
-  - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU，其他方案不保证）。
-  - ARM64 (aarch64) 架构。
-  - 已安装 Termux 应用。
-  - BusyBox 静态二进制文件（下方提供）。
+- 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU，其他方案不保证）。
+- ARM64 (aarch64) 架构。
+- 已安装 Termux 应用。
+- BusyBox 静态二进制文件（下方提供）。
 
 **若没有 Root 权限**，可以尝试 [Yonle/termux-proot](https://github.com/Yonle/termux-proot)。
 
@@ -166,16 +169,18 @@ termux-sandbox import mysandbox.tar.gz
 
 ## 实现原理
 
-  * 利用 **Mount namespaces**（挂载命名空间）隔离环境，同时允许将特定的宿主路径重新绑定 (rebind) 到沙盒内。
-  * 利用 **Chroot** 提供基于 Termux bootstrap 的最小化根文件系统。
-  * 利用 **`LD_PRELOAD` 库** 拦截并覆盖少量的系统调用，向应用程序报告非 Root UID，从而使 `apt`、`pkg` 等 Termux 工具能正常运行。
-  * 该设计完全避免了修改宿主 Termux 环境，确保每个沙盒都是自包含的。
-  * 导出和导入时，会自动清理 APT 缓存，以及排除 `busybox`、`entry.sh`、挂载点等环境无关内容，尽量减小导出体积。
+* 利用 **Mount namespaces**（挂载命名空间）隔离环境，同时允许将特定的宿主路径重新绑定 (rebind) 到沙盒内。
+* 利用 **Chroot** 提供基于 Termux bootstrap 的最小化根文件系统。
+* 利用 **`LD_PRELOAD` 库** 拦截并覆盖少量的系统调用，向应用程序报告非 Root UID，从而使 `apt`、`pkg` 等 Termux 工具能正常运行。
+* 该设计完全避免了修改宿主 Termux 环境，确保每个沙盒都是自包含的。
+* **共享网络命名空间** 允许沙盒直接复用宿主机的网络连接。
+* **自动 DNS 配置** 会生成标准的 Linux `/etc/resolv.conf`（自动检测 DNS 连通性），绕过了在 Chroot 环境中经常失效的 Android 特有 DNS 属性查询。
+* 导出和导入时，会自动清理 APT 缓存，以及排除 `busybox`、`entry.sh`、挂载点等环境无关内容，尽量减小导出体积。
 
 ## 致谢
 
-  * 静态 BusyBox 二进制文件由 [EXALAB/BusyBox-static](https://github.com/EXALAB/Busybox-static/blob/main/busybox_arm64) 提供。
-  * Termux bootstrap 包来自 [Termux 官方项目](https://github.com/termux/termux-packages)。
+* 静态 BusyBox 二进制文件由 [EXALAB/BusyBox-static](https://github.com/EXALAB/Busybox-static/blob/main/busybox_arm64) 提供。
+* Termux bootstrap 包来自 [Termux 官方项目](https://github.com/termux/termux-packages)。
 
 ## 许可证
 
