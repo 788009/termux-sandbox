@@ -36,7 +36,7 @@ It is designed for testing scripts, building software, or keeping the main envir
 - **Safe Defaults**  
   The sandbox starts minimal and does not modify the host Termux installation unless explicitly invoked.
 
-- **Export and Import**
+- **Export and Import**  
   Supports exporting and importing sandboxes, facilitating environment backups or sharing, and eliminating cumbersome configuration steps.
 
 ## Requirements
