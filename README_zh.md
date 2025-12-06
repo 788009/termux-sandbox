@@ -95,6 +95,12 @@ termux-sandbox enter dev
 
 若因为某些原因无法退出沙盒，请重启设备（也欢迎提 issue）。
 
+### 查看沙盒列表与状态
+
+```bash
+termux-sandbox list
+```
+
 ### 删除沙盒
 
 ```bash
