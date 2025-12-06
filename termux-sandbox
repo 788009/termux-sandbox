@@ -234,9 +234,14 @@ cmd_enter() {
 
     # === BASE SYSTEM MOUNTS (Essential) ===
     # Mount necessary directories for the sandbox OS to function
+    ABS_BASE=$(realpath "$HOME/.termux-sandbox")
+    
     for item in /*; do
         name=$(basename "$item")
-        [[ "$HOME/.termux-sandbox" == *"$name"* ]] && continue
+        ABS_ITEM=$(realpath "$item")
+        if [[ "$ABS_BASE" == "$ABS_ITEM"* ]]; then
+            continue
+        fi
         [[ "$name" == "etc" ]] && continue
         
         # Skip sensitive directories here.
