@@ -36,8 +36,8 @@ It is designed for testing scripts, building software, or keeping the main envir
 - **Safe Defaults**  
   The sandbox starts minimal and does not modify the host Termux installation unless explicitly invoked.
 
-- **Export and Import**  
-  Supports exporting and importing sandboxes, facilitating environment backups or sharing, and eliminating cumbersome configuration steps.
+- **Duplicate, Export, and Import**
+  Allows for easy sandbox duplication, backup (exporting), and environment recovery/sharing (importing), significantly streamlining setup and maintenance.
 
 ## Requirements
 
@@ -67,6 +67,9 @@ chmod +x $PREFIX/bin/termux-sandbox
 ```
 
 ## Usage
+
+<details>
+<summary>Click to expand</summary>
 
 **Requires `tsu` environment.**
 
@@ -134,6 +137,18 @@ termux-sandbox delete dev
 3.  **Uninstalling Termux?**
       * Please **reboot your device** first. This guarantees that all sandbox mounts are disconnected before the Termux app data is wiped by Android.
 
+### Rename a sandbox
+
+```bash
+termux-sandbox rename mysandbox yoursandbox
+```
+
+### Duplicate a sandbox
+
+```bash
+termux-sandbox duplicate mysandbox mysandbox2
+```
+
 ### Export a sandbox
 
 ```bash
@@ -145,6 +160,8 @@ termux-sandbox export <name> <file.tar.gz>
 ```bash
 termux-sandbox import <file.tar.gz>
 ```
+
+</details>
 
 ## Implementation Overview
 

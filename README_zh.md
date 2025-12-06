@@ -34,8 +34,8 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
   - **无侵入设计**  
     沙盒保持极简与隔离，除非显式操作，否则绝不修改或污染原本的 Termux 环境。
 
-  - **导出与导入**  
-    支持导出与导入沙盒，方便备份或分享环境，免去繁琐的配置步骤。
+  - **复制、导出与导入**
+    支持沙盒的复制、备份（导出），以及环境恢复与共享（导入），大幅简化了环境的配置和维护流程。
 
 ## 要求
 
@@ -66,6 +66,9 @@ chmod +x $PREFIX/bin/termux-sandbox
 
 ## 使用方法
 
+<details>
+<summary>点击展开</summary>
+
 **需要 `tsu` 环境**
 
 `create`、`enter` 和 `delete` 命令若未指定名称，则实际名称为 `default`。
@@ -75,7 +78,7 @@ chmod +x $PREFIX/bin/termux-sandbox
 ```bash
 termux-sandbox create
 # 或者指定名称
-termux-sandbox create dev
+termux-sandbox create mysandbox
 ```
 
 ### 进入沙盒（两种模式）
@@ -87,7 +90,7 @@ termux-sandbox create dev
 ```bash
 termux-sandbox enter
 # 或
-termux-sandbox enter dev
+termux-sandbox enter mysandbox
 ```
 
 #### 2. 无限制模式（高级）
@@ -97,7 +100,7 @@ termux-sandbox enter dev
 ```bash
 termux-sandbox enter -b
 # 或
-termux-sandbox enter --b dev
+termux-sandbox enter --b mysandbox
 ```
 
 **无限制模式警告：**
@@ -124,7 +127,7 @@ termux-sandbox list
 ```bash
 termux-sandbox delete
 # 或者指定名称
-termux-sandbox delete dev
+termux-sandbox delete mysandbox
 ```
 
 **警告：关于删除沙盒**
@@ -135,17 +138,31 @@ termux-sandbox delete dev
 3.  **关于卸载 Termux**
       * 请务必先**重启手机**。重启是强制断开所有挂载的唯一绝对安全的方法，防止安卓系统在卸载清理数据时误删底层文件。
 
+### 重命名沙盒
+
+```bash
+termux-sandbox rename mysandbox yoursandbox
+```
+
+### 复制沙盒
+
+```bash
+termux-sandbox duplicate mysandbox mysandbox2
+```
+
 ### 导出沙盒
 
 ```bash
-termux-sandbox export <name> <file.tar.gz>
+termux-sandbox export mysandbox mysandbox.tar.gz
 ```
 
 ### 导入沙盒
 
 ```bash
-termux-sandbox import <file.tar.gz>
+termux-sandbox import mysandbox.tar.gz
 ```
+
+</details>
 
 ## 实现原理
 
