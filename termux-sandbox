@@ -279,9 +279,54 @@ cmd_delete() {
     if [ -d "$SANDBOX_BASE" ]; then rm -rf "$SANDBOX_BASE"; echo "[+] Deleted."; else echo "[!] Sandbox not found."; fi
 }
 
+cmd_list() {
+    BASE_DIR="$HOME/.termux-sandbox"
+    
+    # Check if the base directory exists
+    if [ ! -d "$BASE_DIR" ]; then
+        echo "[!] No sandboxes found, or tsu environment not detected."
+        return
+    fi
+
+    # Table header format
+    echo
+    printf "%-20s | %-10s\n" "SANDBOX NAME" "STATUS"
+    echo "---------------------+-----------"
+
+    found=0
+    for dir in "$BASE_DIR"/*; do
+        # Skip non-directories (e.g., bootstrap.zip)
+        [ ! -d "$dir" ] && continue
+        
+        name=$(basename "$dir")
+        found=1
+        
+        # Check if mounted (to determine if the sandbox is running)
+        # If the sandbox path is found in /proc/mounts, it means it hasn't been unmounted yet
+        if grep -q "$dir" /proc/mounts; then
+            status="🟢 Active"
+        else
+            status="⚪ Idle"
+        fi
+        
+        printf "%-20s | %s\n" "$name" "$status"
+    done
+
+    if [ "$found" -eq 0 ]; then
+        echo "       (No sandboxes created)"
+    fi
+    echo
+}
+
 case "$1" in
     create) cmd_create ;;
     enter)  cmd_enter ;;
     delete) cmd_delete ;;
-    *) echo "Usage: $(basename "$0") {create|enter|delete} [name]" ;;
+    list)   cmd_list ;;
+    *)
+        echo "Usage: "
+        echo "  $(basename "$0") {create|enter|delete} [name]"
+        echo "  $(basename "$0") list"
+        exit 1
+        ;;
 esac
