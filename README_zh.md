@@ -34,6 +34,9 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
   - **无侵入设计**  
     沙盒保持极简与隔离，除非显式操作，否则绝不修改或污染原本的 Termux 环境。
 
+  - **导出与导入**
+    支持导出与导入沙盒，方便备份或分享环境，免去繁琐的配置步骤。
+
 ## 要求
 
   - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU，其他方案不保证）。
@@ -132,12 +135,25 @@ termux-sandbox delete dev
 3.  **关于卸载 Termux**
       * 请务必先**重启手机**。重启是强制断开所有挂载的唯一绝对安全的方法，防止安卓系统在卸载清理数据时误删底层文件。
 
+### 导出沙盒
+
+```bash
+termux-sandbox export <name> <file.tar.gz>
+```
+
+### 导入沙盒
+
+```bash
+termux-sandbox import <file.tar.gz>
+```
+
 ## 实现原理
 
   * 利用 **Mount namespaces**（挂载命名空间）隔离环境，同时允许将特定的宿主路径重新绑定 (rebind) 到沙盒内。
   * 利用 **Chroot** 提供基于 Termux bootstrap 的最小化根文件系统。
   * 利用 **`LD_PRELOAD` 库** 拦截并覆盖少量的系统调用，向应用程序报告非 Root UID，从而使 `apt`、`pkg` 等 Termux 工具能正常运行。
   * 该设计完全避免了修改宿主 Termux 环境，确保每个沙盒都是自包含的。
+  * 导出和导入时，会自动清理 APT 缓存，以及排除 `busybox`、`entry.sh`、挂载点等环境无关内容，尽量减小导出体积。
 
 ## 致谢
 

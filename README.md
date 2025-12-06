@@ -36,6 +36,9 @@ It is designed for testing scripts, building software, or keeping the main envir
 - **Safe Defaults**  
   The sandbox starts minimal and does not modify the host Termux installation unless explicitly invoked.
 
+- **Export and Import**
+  Supports exporting and importing sandboxes, facilitating environment backups or sharing, and eliminating cumbersome configuration steps.
+
 ## Requirements
 
 - Android device with root access (Magisk or KernelSU; others may be compatible)
@@ -131,12 +134,25 @@ termux-sandbox delete dev
 3.  **Uninstalling Termux?**
       * Please **reboot your device** first. This guarantees that all sandbox mounts are disconnected before the Termux app data is wiped by Android.
 
+### Export a sandbox
+
+```bash
+termux-sandbox export <name> <file.tar.gz>
+```
+
+### Import a sandbox
+
+```bash
+termux-sandbox import <file.tar.gz>
+```
+
 ## Implementation Overview
 
 * **Mount namespaces** are used to isolate the environment while allowing selected host paths to be rebound.
 * **Chroot** provides a minimal root filesystem based on the Termux bootstrap.
 * An **`LD_PRELOAD` library** overrides a small set of system calls to report a non-root UID, allowing `apt`, `pkg`, and other Termux tools to operate normally.
 * The design avoids modifying host Termux and keeps each sandbox self-contained.
+* When exporting and importing, APT caches will be automatically cleaned, and environment-irrelevant content such as `busybox`, `entry.sh`, and mount points will be excluded to minimize the export file size.
 
 ## Credits
 
