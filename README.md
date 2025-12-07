@@ -35,11 +35,11 @@ It is designed for testing scripts, building software, or keeping the main envir
 - **Seamless Networking**  
   Out-of-the-box internet access. Automatically configures DNS (`resolv.conf`) and network interfaces, so tools like `pkg`, `pip`, and `git` work immediately without manual host patching.
 
-- **Host Access**
+- **Host Access**  
   - **Safe mode (default):** No access to `/sdcard` or the host Android system.
   - **Unrestricted mode:** Optional flags to map `/sdcard` and `/host_root` for advanced tasks.
 
-- **Duplicate, Export, and Import**
+- **Duplicate, Export, and Import**  
   Allows for easy sandbox duplication, backup (exporting), and environment recovery/sharing (importing), significantly streamlining setup and maintenance.
 
 ## Requirements
