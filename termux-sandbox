@@ -10,9 +10,31 @@ BOOTSTRAP_URL_ARM="https://github.com/termux/termux-packages/releases/download/b
 BOOTSTRAP_URL_AARCH64="https://github.com/termux/termux-packages/releases/download/bootstrap-2025.11.30-r1%2Bapt.android-7/bootstrap-aarch64.zip"
 
 # Busybox configuration
-BUSYBOX_URL="https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64"
-BUSYBOX_SHA256="f3154aad70b2928e3a57be3e4e966d2574904425fd63e717b9aa55933cfaf08c"
-BUSYBOX_PATH="$HOME/busybox_arm64"
+# ARM64 (aarch64)
+BUSYBOX_URL_AARCH64="https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64"
+BUSYBOX_SHA256_AARCH64="f3154aad70b2928e3a57be3e4e966d2574904425fd63e717b9aa55933cfaf08c"
+
+# ARM (arm/armv7)
+BUSYBOX_URL_ARM="https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm"
+BUSYBOX_SHA256_ARM="03ac599984d511f41c1571814a85ad41a92ddd4d21691bff239b32f5e74dc49b"
+
+# Convert the dpkg architecture name into the required Busybox filename suffix
+BUSYBOX_SUFFIX=""
+case "$ARCH" in
+    aarch64)
+        BUSYBOX_SUFFIX="arm64" # Convert aarch64 to arm64
+        ;;
+    arm|armhf) 
+        BUSYBOX_SUFFIX="arm"   # Use arm for arm or armhf
+        ;;
+    *)
+        # Use architecture name directly for other architectures (e.g., x86_64)
+        BUSYBOX_SUFFIX="$ARCH"
+        ;;
+esac
+
+# Dynamic path based on the standardized BusyBox filename suffix
+BUSYBOX_PATH="$HOME/busybox_$BUSYBOX_SUFFIX"
 TARGET_DOMAIN="packages-cf.termux.dev"
 # ===============================================
 
@@ -48,29 +70,40 @@ get_bootstrap_url() {
 find_busybox() {
     if [ -f "$BUSYBOX_PATH" ]; then echo "$BUSYBOX_PATH"; return; fi
     SCRIPT_DIR=$(dirname "$(realpath "$0")")
-    if [ -f "$SCRIPT_DIR/busybox_arm64" ]; then echo "$SCRIPT_DIR/busybox_arm64"; return; fi
+    # Check for local file with architecture suffix
+    if [ -f "$SCRIPT_DIR/busybox_$ARCH" ]; then echo "$SCRIPT_DIR/busybox_$ARCH"; return; fi
     return 1
 }
 
 # Check and automatically download Busybox if missing
-# Check and automatically download Busybox if missing
 check_busybox() {
     local EXIST_PATH=$(find_busybox)
-    
-    # If exists, return immediately
-    if [ -n "$EXIST_PATH" ]; then
-        return 0
-    fi
+    if [ -n "$EXIST_PATH" ]; then return 0; fi
 
     echo "[!] Busybox binary not found."
     
-    # Architecture check
-    if [ "$ARCH" != "aarch64" ]; then
-        echo "[!] Warning: Auto-download is configured for aarch64. Your arch is $ARCH."
-    fi
+    local CURRENT_URL=""
+    local CURRENT_SHA=""
 
-    echo "[+] Downloading Busybox from release..."
-    curl -L "$BUSYBOX_URL" -o "$BUSYBOX_PATH" --fail
+    # Select URL and SHA based on Architecture
+    case "$ARCH" in
+        aarch64)
+            CURRENT_URL="$BUSYBOX_URL_AARCH64"
+            CURRENT_SHA="$BUSYBOX_SHA256_AARCH64"
+            ;;
+        arm)
+            CURRENT_URL="$BUSYBOX_URL_ARM"
+            CURRENT_SHA="$BUSYBOX_SHA256_ARM"
+            ;;
+        *)
+            echo "[!] Error: Unsupported architecture: $ARCH"
+            echo "    This tool only supports aarch64 and arm."
+            exit 1
+            ;;
+    esac
+
+    echo "[+] Downloading Busybox for $ARCH..."
+    curl -L "$CURRENT_URL" -o "$BUSYBOX_PATH" --fail
 
     if [ $? -ne 0 ]; then
         echo "[!] Error: Failed to download Busybox. Please install it manually."
@@ -78,20 +111,18 @@ check_busybox() {
         exit 1
     fi
 
-    # === SHA256 Verification ===
     echo "[*] Verifying checksum..."
     local FILE_HASH=$(sha256sum "$BUSYBOX_PATH" | awk '{print $1}')
     
-    if [ "$FILE_HASH" != "$BUSYBOX_SHA256" ]; then
+    if [ "$FILE_HASH" != "$CURRENT_SHA" ]; then
         echo "[!] Error: Checksum mismatch!"
-        echo "    Expected: $BUSYBOX_SHA256"
+        echo "    Expected: $CURRENT_SHA"
         echo "    Actual:   $FILE_HASH"
-        echo "[!] Security Warning: The downloaded file may be corrupted or compromised."
+        echo "[!] Security Warning: The downloaded file may be corrupted."
         rm -f "$BUSYBOX_PATH"
         exit 1
     fi
     echo "[+] Checksum verified."
-    # ===========================
 
     chmod 755 "$BUSYBOX_PATH"
     echo "[+] Busybox installed to $BUSYBOX_PATH"
