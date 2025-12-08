@@ -36,8 +36,8 @@ It is designed for testing scripts, building software, or keeping the main envir
   Out-of-the-box internet access. Automatically configures DNS (`resolv.conf`) and network interfaces, so tools like `pkg`, `pip`, and `git` work immediately without manual host patching.
 
 - **Host Access**  
-  - **Safe mode (default):** No access to `/sdcard` or the host Android system.
-  - **Unrestricted mode:** Optional flags to map `/sdcard` and `/host_root` for advanced tasks.
+  - **Safe mode (default)**: No access to `/sdcard` or the host Android system.
+  - **Unrestricted mode**: Optional flags to map `/sdcard` and `/host_root` for advanced tasks.
 
 - **Duplicate, Export, and Import**  
   Allows for easy sandbox duplication, backup (exporting), and environment recovery/sharing (importing), significantly streamlining setup and maintenance.
@@ -78,13 +78,34 @@ chmod +x $PREFIX/bin/termux-sandbox
 
 If no name is specified for the `create`, `enter`, and `delete` commands, the actual name used will be `default`.
 
-### Create a new sandbox
+### Create a sandbox
+
+#### 1. Default creation
+
+When no source is specified, the script automatically downloads the official Termux bootstrap matching your device's architecture (ARMHF or ARM64).
+
+The current default version is [this release](https://github.com/termux/termux-packages/releases/tag/bootstrap-2025.11.30-r1%2Bapt.android-7).
 
 ```bash
 termux-sandbox create
 # or with name
-termux-sandbox create mysandbox
+termux-sandbox create mydevbox
 ```
+
+#### 2. Using a custom bootstrap
+
+You can use the `--source` option to provide a local file path or a direct download URL for a custom bootstrap archive (must be `.zip`).
+
+```bash
+# Using a local file
+termux-sandbox create mysandbox --source /path/to/mybootstrap.zip
+# Using a direct URL
+termux-sandbox create mysandbox --source https://example.com/custom_bootstrap.zip
+```
+
+The default bootstrap is not always the latest. You can find the latest version and more official bootstraps [here](https://github.com/termux/termux-packages/releases).
+
+**Note on Architectures**: When using a custom source, ensure the archive is built for the **correct architecture** (`ARMHF` or `ARM64`) of your device, as the script will skip the smart architecture detection.
 
 ### Enter a sandbox (two modes)
 
@@ -108,7 +129,7 @@ termux-sandbox enter -b
 termux-sandbox enter mysandbox -b
 ```
 
-**Warning for Unrestricted Mode:**
+**Warning for Unrestricted Mode**:
 When using `-b`, you have **Real Root Access** to your physical file system.
 
   * Deleting files in `/sdcard` will permanently delete them from your phone.
@@ -132,7 +153,7 @@ termux-sandbox delete
 termux-sandbox delete mysandbox
 ```
 
-**Recommendation:**
+**Recommendation**:
 Always use the `termux-sandbox delete` command. This ensures that lock files and temporary scripts are cleaned up correctly.
 
 This tool uses Private Mount Namespaces. This means mounts created inside the sandbox are invisible to the host system. While manual deletion of the sandbox directory is safe, using the built-in delete command is still the preferred method to prevent state inconsistencies.
