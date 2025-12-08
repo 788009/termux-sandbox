@@ -389,16 +389,14 @@ EOF
 }
 
 cmd_delete() {
-    # 1. Check if the sandbox directory exists
+    # 1. Check if directory exists
     if [ ! -d "$SANDBOX_BASE" ]; then
         echo "[!] Sandbox '$SANDBOX_NAME' not found."
         return
     fi
 
-    # 2. Check if the sandbox is currently active
-    # We must prevent deletion while the sandbox is in use to avoid I/O errors.
-    # Note: We use the lock file check because 'grep /proc/mounts' no longer works 
-    # with private namespaces.
+    # 2. Check Lock File (Process Safety)
+    # This prevents deleting while a script is actively running inside
     if is_active "$SANDBOX_NAME"; then
         echo "[!] Sandbox is currently active (Lock file exists)."
         echo "    Please exit the sandbox first."
@@ -406,12 +404,41 @@ cmd_delete() {
     fi
 
     echo "[*] Deleting sandbox: $SANDBOX_NAME"
+
+    # ================== SAFETY BARRIER (LIFE SAVER) ==================
+    # 3. Mount Point Detection & Cleanup
+    # We check if the host kernel sees ANY mounts under the sandbox directory.
+    # This catches leaked global mounts (like your previous accident).
     
-    # 3. Delete directory directly
-    # Safety Note: Since we use Private Mount Namespaces (unshare), the mount points
-    # inside the sandbox are NOT visible to the host system.
-    # Therefore, 'rm -rf' will simply delete the directory structure and will NOT
-    # recursively delete host files (like /sdcard or /system), making it safe.
+    # Attempt to unmount anything left over (Lazy unmount is safest)
+    # grep -F: Fixed string search (faster/safer)
+    if grep -qF "$SANDBOX_BASE" /proc/mounts; then
+        echo "    ⚠️  Warning: Residual mounts detected. Attempting to unmount..."
+        
+        # Try to unmount everything under that path
+        # awk prints the mount point, sort -r ensures deep paths unmount first
+        grep -F "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | while read -r mountpoint; do
+            echo "        - Unmounting: $mountpoint"
+            umount -l "$mountpoint" 2>/dev/null
+        done
+    fi
+
+    # 4. FINAL CHECK - THE "DO NOT BRICK" SWITCH
+    # If after attempting unmount, it's STILL mounted, we MUST ABORT.
+    if grep -qF "$SANDBOX_BASE" /proc/mounts; then
+        echo ""
+        echo "❌ [CRITICAL ERROR] UNSAFE STATE DETECTED!"
+        echo "    The system still reports active mounts inside the sandbox."
+        echo "    Executing 'rm' now would delete HOST system files."
+        echo "    Path: $SANDBOX_BASE"
+        echo ""
+        echo "    Suggestion: Reboot your device to clear stuck mounts."
+        return 1
+    fi
+    # ====================================================================
+    
+    # 5. Safe to delete
+    # Only runs if the directory is purely files, no "wormholes" (mounts).
     rm -rf "$SANDBOX_BASE"
     
     echo "[+] Sandbox deleted successfully."
