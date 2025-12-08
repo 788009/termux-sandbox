@@ -5,9 +5,9 @@ SANDBOX_NAME="${2:-default}"
 SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
 ARCH=$(dpkg --print-architecture)
 
-BOOTSTRAP_VERSION="bootstrap-2025.11.30-r1%2Bapt.android-7"
-BOOTSTRAP_URL_ARM="https://github.com/termux/termux-packages/releases/download/${BOOTSTRAP_VERSION}/bootstrap-arm.zip"
-BOOTSTRAP_URL_AARCH64="https://github.com/termux/termux-packages/releases/download/${BOOTSTRAP_VERSION}/bootstrap-aarch64.zip"
+# Default: Termux Bootstrap 2025.11.30-r1+apt.android-7
+BOOTSTRAP_URL_ARM="https://github.com/termux/termux-packages/releases/download/bootstrap-2025.11.30-r1%2Bapt.android-7/bootstrap-arm.zip"
+BOOTSTRAP_URL_AARCH64="https://github.com/termux/termux-packages/releases/download/bootstrap-2025.11.30-r1%2Bapt.android-7/bootstrap-aarch64.zip"
 
 # Busybox configuration
 BUSYBOX_URL="https://github.com/788009/termux-sandbox/releases/download/v1.0/busybox_arm64"
@@ -141,6 +141,37 @@ EOF
 }
 
 cmd_create() {
+    local TARGET_NAME=""
+    local CUSTOM_SOURCE=""
+
+    # === Argument Parsing ===
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --source)
+                if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                    CUSTOM_SOURCE="$2"
+                    shift 2
+                else
+                    echo "[!] Error: --source requires a URL or file path."
+                    exit 1
+                fi
+                ;;
+            -*)
+                echo "[!] Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                if [ -z "$TARGET_NAME" ]; then
+                    TARGET_NAME="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    SANDBOX_NAME="${TARGET_NAME:-default}"
+    SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
+
     echo "[*] Creating sandbox: $SANDBOX_NAME"
     TERMUX_USR="$SANDBOX_BASE/data/data/com.termux/files/usr"
     TERMUX_HOME="$SANDBOX_BASE/data/data/com.termux/files/home"
@@ -148,9 +179,7 @@ cmd_create() {
     
     if [ -d "$TERMUX_USR/bin" ]; then echo "[!] Environment exists."; exit 0; fi
     
-    # Ensure Busybox is available
     check_busybox
-    
     LOCAL_BUSYBOX=$(find_busybox)
     if [ -z "$LOCAL_BUSYBOX" ]; then 
         echo "[!] Error: Busybox not found even after download attempt."; exit 1
@@ -164,13 +193,36 @@ cmd_create() {
     mkdir -p "$TERMUX_USR/var/lib/dpkg/updates"
     touch "$TERMUX_USR/var/lib/dpkg/status" "$TERMUX_USR/var/lib/dpkg/available"
     
-    BOOTSTRAP_FILE="$HOME/.termux-sandbox/bootstrap.zip"
     mkdir -p "$HOME/.termux-sandbox"
 
-    if [ ! -f "$BOOTSTRAP_FILE" ]; then
-        echo "[+] Downloading Bootstrap..."
-        curl -L $(get_bootstrap_url) -o "$BOOTSTRAP_FILE" --fail || exit 1
+    # === SOURCE SELECTION LOGIC ===
+    local BOOTSTRAP_FILE=""
+
+    if [ -n "$CUSTOM_SOURCE" ]; then
+        # Case A: User provided a source
+        echo "[*] Using custom source: $CUSTOM_SOURCE"
+        
+        if [ -f "$CUSTOM_SOURCE" ]; then
+            # A-1: Local File
+            BOOTSTRAP_FILE=$(realpath "$CUSTOM_SOURCE")
+        elif [[ "$CUSTOM_SOURCE" == http* ]]; then
+            # A-2: URL
+            BOOTSTRAP_FILE="$HOME/.termux-sandbox/custom_bootstrap.zip"
+            echo "[+] Downloading custom bootstrap..."
+            curl -L "$CUSTOM_SOURCE" -o "$BOOTSTRAP_FILE" --fail || exit 1
+        else
+            echo "[!] Error: Source must be a local file path or http(s) URL."
+            exit 1
+        fi
+    else
+        # Case B: Use Default
+        BOOTSTRAP_FILE="$HOME/.termux-sandbox/bootstrap.zip"
+        if [ ! -f "$BOOTSTRAP_FILE" ]; then
+            echo "[+] Downloading Default Bootstrap..."
+            curl -L $(get_bootstrap_url) -o "$BOOTSTRAP_FILE" --fail || exit 1
+        fi
     fi
+    # ==============================
     
     echo "[+] Extracting..."
     unzip -o -q "$BOOTSTRAP_FILE" -d "$TERMUX_USR"
@@ -751,7 +803,7 @@ case "$1" in
     list)   cmd_list ;;
     *) 
         echo "Usage:"
-        echo "  $(basename "$0") create [name]"
+        echo "  $(basename "$0") create [name] [--source <url/file>]"
         echo "  $(basename "$0") enter [name] [--bind|-b]"
         echo "  $(basename "$0") delete [name]"
         echo "  $(basename "$0") rename <old> <new>"
