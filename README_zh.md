@@ -40,14 +40,34 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
 - **复制、导出与导入**  
   支持沙盒的复制、备份（导出），以及环境恢复与共享（导入），大幅简化了环境的配置和维护流程。
 
-## 要求
+## 运行要求
 
 - 拥有 Root 权限的 Android 设备（Magisk 或 KernelSU，其他方案不保证）。
 - ARM64 (aarch64) 架构。
 - 已安装 Termux 应用。
 - BusyBox 静态二进制文件（下方提供）。
 
-**若没有 Root 权限**，可以尝试 [Yonle/termux-proot](https://github.com/Yonle/termux-proot)。
+非 Root 用户可以尝试 [Yonle/termux-proot](https://github.com/Yonle/termux-proot)。
+
+### 关于内核兼容性的说明
+
+本项目依赖 Linux 挂载命名空间（Mount Namespaces）。
+
+如果在 `tsu` 环境下运行时遇到以下错误：
+
+```
+unshare: Operation not permitted
+```
+
+这表明由于内核配置、SELinux 策略或厂商限制，你的设备不支持向用户进程开放挂载命名空间。在这种情况下，沙盒无法在该设备上运行。
+
+你也可以在 `tsu` 环境中运行以下命令来预先验证兼容性：
+
+```bash
+unshare --mount /bin/true
+```
+
+如果该命令返回错误，则说明你的内核不支持所需的隔离特性。
 
 ## 安装
 
@@ -55,16 +75,21 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
 
 ```bash
 pkg update
-pkg install tsu curl zip clang -y
+pkg install tsu curl zip clang util-linux -y
 ```
 
-*（`clang` 用于编译 `fake_uid.c`，实现 UID 欺骗）*
+  * `clang` 用于编译 `fake_uid.c` 以实现 UID 欺骗。
+  * `util-linux` 提供 `unshare` 工具，在某些系统中可能已经预装。
+  * `tsu` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -i` 可能会导致依赖解析失败。
+
 
 ### 2. 安装 termux-sandbox 脚本
 
+脚本必须安装在 Termux 的前缀（$PREFIX）路径内。切勿安装到系统的 `/bin` 目录，该目录在 Android 上是只读的。
+
 ```bash
-curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o $PREFIX/bin/termux-sandbox
-chmod +x $PREFIX/bin/termux-sandbox
+curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
+chmod +x "$PREFIX/bin/termux-sandbox"
 ```
 
 ## 使用方法

@@ -44,12 +44,33 @@ It is designed for testing scripts, building software, or keeping the main envir
 
 ## Requirements
 
-- Android device with root access (Magisk or KernelSU; others may be compatible)
+- Android device with root access  
+  (Magisk or KernelSU recommended; other root solutions may work but are not guaranteed)
 - Architecture: ARM64 (aarch64)
-- Current Termux installation
+- A working Termux installation
 - BusyBox static binary (provided below)
 
-**Note**: **For non-root users**, use [Yonle/termux-proot](https://github.com/Yonle/termux-proot) instead.
+For non-root users, consider using [Yonle/termux-proot](https://github.com/Yonle/termux-proot) instead.
+
+### Notes on kernel compatibility
+
+This project relies on Linux mount namespaces.
+
+If you encounter the following error when running under `tsu`:
+
+```
+unshare: Operation not permitted
+```
+
+it indicates that mount namespaces are not available to user processes on your device, due to kernel configuration, SELinux policy, or vendor-specific restrictions. In this case, the sandbox cannot function on that device.
+
+You can also verify compatibility by running this command in `tsu`:
+
+```bash
+unshare --mount /bin/true
+```
+
+If it returns an error, your kernel does not support the required isolation features.
 
 ## Installation
 
@@ -57,16 +78,20 @@ It is designed for testing scripts, building software, or keeping the main envir
 
 ```bash
 pkg update
-pkg install tsu curl zip clang -y
+pkg install tsu curl zip clang util-linux -y
 ```
 
-*(`clang` is required to compile `fake_uid.c` for UID spoofing.)*
+* `clang` is required to compile `fake_uid.c` for UID spoofing.
+* `util-linux` provides `unshare`. On some systems it may already be present.
+* `tsu` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
 
 ### 2. Install the sandbox manager script
 
+The script must be installed inside the Termux prefix. Do not install it into `/bin`, which is read-only on Android.
+
 ```bash
-curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o $PREFIX/bin/termux-sandbox
-chmod +x $PREFIX/bin/termux-sandbox
+curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
+chmod +x "$PREFIX/bin/termux-sandbox"
 ```
 
 ## Usage
