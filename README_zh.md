@@ -85,7 +85,7 @@ pkg install tsu curl zip clang util-linux -y
 
 ### 2. 安装 termux-sandbox 脚本
 
-脚本必须安装在 Termux 的前缀（$PREFIX）路径内。切勿安装到系统的 `/bin` 目录，该目录在 Android 上是只读的。
+脚本必须安装在 Termux 的前缀（`$PREFIX`）路径内。切勿安装到系统的 `/bin` 目录，该目录在 Android 上是只读的。
 
 ```bash
 curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
