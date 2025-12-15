@@ -88,7 +88,7 @@ pkg install tsu curl zip clang util-linux -y
 脚本必须安装在 Termux 的前缀（`$PREFIX`）路径内。切勿安装到系统的 `/bin` 目录，该目录在 Android 上是只读的。
 
 ```bash
-curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
+curl -L "https://github.com/788009/termux-sandbox/releases/download/latest/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
 chmod +x "$PREFIX/bin/termux-sandbox"
 ```
 
@@ -100,6 +100,13 @@ chmod +x "$PREFIX/bin/termux-sandbox"
 **需要 `tsu` 环境**
 
 `create`、`enter` 和 `delete` 命令若未指定名称，则实际名称为 `default`。
+
+### 查看版本
+
+```bash
+termux-sandbox version
+termux-sandbox --version
+```
 
 ### 创建沙盒
 

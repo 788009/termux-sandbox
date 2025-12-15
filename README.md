@@ -90,7 +90,7 @@ pkg install tsu curl zip clang util-linux -y
 The script must be installed inside the Termux prefix. Do not install it into `/bin`, which is read-only on Android.
 
 ```bash
-curl -L "https://github.com/788009/termux-sandbox/releases/download/v1.0/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
+curl -L "https://github.com/788009/termux-sandbox/releases/download/latest/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
 chmod +x "$PREFIX/bin/termux-sandbox"
 ```
 
@@ -102,6 +102,13 @@ chmod +x "$PREFIX/bin/termux-sandbox"
 **Requires `tsu` environment.**
 
 If no name is specified for the `create`, `enter`, and `delete` commands, the actual name used will be `default`.
+
+### View the version
+
+```bash
+termux-sandbox version
+termux-sandbox --version
+```
 
 ### Create a sandbox
 
