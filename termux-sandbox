@@ -1,5 +1,37 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
+# ======================================================
+# SECURITY & ENVIRONMENT PRE-CHECK (MANDATORY)
+# This must be the very first logic executed.
+# ======================================================
+
+# 1. Check for Root Privileges
+if [ "$(id -u)" -ne 0 ]; then
+    echo "❌ Error: Root privileges required."
+    echo "------------------------------------------------"
+    echo "This tool performs low-level system operations that require real root access."
+    echo ""
+    echo "FIX: Please run: tsu"
+    echo "------------------------------------------------"
+    exit 1
+fi
+
+# 2. Check for 'Clean' Environment (Must use tsu, not su)
+# Standard 'su' resets PATH to /system/bin, breaking Termux dependencies.
+if [[ ":$PATH:" != *":/data/data/com.termux/files/usr/bin:"* ]]; then
+    echo "❌ Error: 'Dirty' Root environment detected."
+    echo "------------------------------------------------"
+    echo "You are root, but you likely used 'su' instead of 'tsu'."
+    echo "Standard 'su' strips Termux environment variables, which will cause this script to crash during initialization."
+    echo ""
+    echo "FIX: Please use 'tsu' to enter the root session:"
+    echo "     1. Exit this session (type 'exit')"
+    echo "     2. Run: pkg install tsu (if not installed)"
+    echo "     3. Run: tsu"
+    echo "------------------------------------------------"
+    exit 1
+fi
+
 # ================= Configuration =================
 SANDBOX_NAME="${2:-default}"
 SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
