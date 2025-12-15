@@ -1,5 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
+VERSION="20251215"
+
 # ======================================================
 # SECURITY & ENVIRONMENT PRE-CHECK (MANDATORY)
 # This must be the very first logic executed.
@@ -698,7 +700,7 @@ cmd_export() {
     local META_FILE="$SANDBOX_DIR/.sandbox_meta"
     echo "ARCH=$ARCH" > "$META_FILE"
     echo "TIMESTAMP=$(date +%s)" >> "$META_FILE"
-    echo "VERSION=1.0" >> "$META_FILE"
+    echo "VERSION=$(VERSION)" >> "$META_FILE"
 
     echo "[*] Compressing..."
     
@@ -855,7 +857,12 @@ cmd_list() {
     echo
 }
 
+cmd_version() {
+    echo "Termux Sandbox $VERSION"
+}
+
 case "$1" in
+    version|--version) cmd_version ;;
     create) shift; cmd_create "$@" ;;
     enter)  shift; cmd_enter "$@"  ;;
     delete) shift; cmd_delete "$@" ;;
@@ -866,6 +873,7 @@ case "$1" in
     list)   cmd_list ;;
     *) 
         echo "Usage:"
+        echo "  $(basename "$0") version"
         echo "  $(basename "$0") create [name] [--source <url/file>]"
         echo "  $(basename "$0") enter [name] [--bind|-b]"
         echo "  $(basename "$0") delete [name]"
