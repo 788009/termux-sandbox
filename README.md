@@ -52,9 +52,12 @@ It is designed for testing scripts, building software, or keeping the main envir
 - BusyBox static binary (provided below)
 
 > [!NOTE]
+> 
 > For non-root users, consider using [Yonle/termux-proot](https://github.com/Yonle/termux-proot) instead.
 
-> [!IMPORTANT] Note on kernel compatibility
+> [!IMPORTANT]
+> 
+> **Note on kernel compatibility**
 > 
 > This project relies on Linux mount namespaces.
 > 
@@ -84,6 +87,7 @@ pkg install tsu curl zip clang util-linux -y
 ```
 
 > [!NOTE]
+> 
 > * `clang` is required to compile `fake_uid.c` for UID spoofing.
 > * `util-linux` provides `unshare`. On some systems it may already be present.
 > * `tsu` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
@@ -91,6 +95,7 @@ pkg install tsu curl zip clang util-linux -y
 ### 2. Install the sandbox manager script
 
 > [!WARNING]
+> 
 > The script must be installed inside the Termux prefix. Do not install it into `/bin`, which is read-only on Android.
 
 ```bash
@@ -100,10 +105,9 @@ chmod +x "$PREFIX/bin/termux-sandbox"
 
 ## Usage
 
-<details>
-<summary>Click to expand</summary>
-
-**Requires `tsu` environment.**
+> [!WARNING]
+> 
+> Requires `tsu` environment.
 
 If no name is specified for the `create`, `enter`, and `delete` commands, the actual name used will be `default`.
 
@@ -140,9 +144,13 @@ termux-sandbox create mysandbox --source https://example.com/custom_bootstrap.zi
 ```
 
 > [!TIP]
+> 
 > The default bootstrap is not always the latest. You can find the latest version and more official bootstraps [here](https://github.com/termux/termux-packages/releases).
 
-> [!NOTE] Note on Architectures
+> [!NOTE]
+> 
+> **Note on Architectures**
+> 
 > When using a custom source, ensure the archive is built for the **correct architecture** (`ARMHF` or `ARM64`) of your device, as the script will skip the smart architecture detection.
 
 ### Enter a sandbox (two modes)
@@ -167,7 +175,10 @@ termux-sandbox enter -b
 termux-sandbox enter mysandbox -b
 ```
 
-> [!CAUTION] Warning for Unrestricted Mode
+> [!CAUTION]
+> 
+> **Warning for Unrestricted Mode**
+> 
 > When using `-b`, you have **Real Root Access** to your physical file system.
 > 
 >   * Deleting files in `/sdcard` will permanently delete them from your phone.
@@ -192,6 +203,7 @@ termux-sandbox delete mysandbox
 ```
 
 > [!TIP]
+> 
 > Always use the `termux-sandbox delete` command. This ensures that lock files and temporary scripts are cleaned up correctly.
 > 
 > This tool uses Private Mount Namespaces. This means mounts created inside the sandbox are invisible to the host system. While manual deletion of the sandbox directory is safe, using the built-in delete command is still the preferred method to prevent state inconsistencies.
@@ -223,8 +235,6 @@ termux-sandbox import mysandbox.tar.gz
 # or skip verifying metadata with --force or -f
 termux-sandbox import mysandbox.tar.gz -f
 ```
-
-</details>
 
 ## Implementation Overview
 
