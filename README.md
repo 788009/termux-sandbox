@@ -5,7 +5,8 @@
 Termux Sandbox provides isolated, clean Termux environments that run with native performance inside an existing Termux installation.  
 It is designed for testing scripts, building software, or keeping the main environment minimal without relying on proot or container runtimes.
 
-**Note**: This tool only provides **environment** isolation, not **security** isolation. Therefore, it **must not** be used for malicious script testing.
+> [!CAUTION] 
+> This tool only provides **environment** isolation, not **security** isolation. Therefore, it **must not** be used for malicious script testing.
 
 ![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
 
@@ -50,27 +51,28 @@ It is designed for testing scripts, building software, or keeping the main envir
 - A working Termux installation
 - BusyBox static binary (provided below)
 
-For non-root users, consider using [Yonle/termux-proot](https://github.com/Yonle/termux-proot) instead.
+> [!NOTE]
+> For non-root users, consider using [Yonle/termux-proot](https://github.com/Yonle/termux-proot) instead.
 
-### Notes on kernel compatibility
-
-This project relies on Linux mount namespaces.
-
-If you encounter the following error when running under `tsu`:
-
-```
-unshare: Operation not permitted
-```
-
-it indicates that mount namespaces are not available to user processes on your device, due to kernel configuration, SELinux policy, or vendor-specific restrictions. In this case, the sandbox cannot function on that device.
-
-You can also verify compatibility by running this command in `tsu`:
-
-```bash
-unshare --mount /bin/true
-```
-
-If it returns an error, your kernel does not support the required isolation features.
+> [!IMPORTANT] Note on kernel compatibility
+> 
+> This project relies on Linux mount namespaces.
+> 
+> If you encounter the following error when running under `tsu`:
+> 
+> ```
+> unshare: Operation not permitted
+> ```
+> 
+> it indicates that mount namespaces are not available to user processes on your device, due to kernel configuration, SELinux policy, or vendor-specific restrictions. In this case, the sandbox cannot function on that device.
+> 
+> You can also verify compatibility by running this command in `tsu`:
+> 
+> ```bash
+> unshare --mount /bin/true
+> ```
+> 
+> If it returns an error, your kernel does not support the required isolation features.
 
 ## Installation
 
@@ -81,13 +83,15 @@ pkg update
 pkg install tsu curl zip clang util-linux -y
 ```
 
-* `clang` is required to compile `fake_uid.c` for UID spoofing.
-* `util-linux` provides `unshare`. On some systems it may already be present.
-* `tsu` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
+> [!NOTE]
+> * `clang` is required to compile `fake_uid.c` for UID spoofing.
+> * `util-linux` provides `unshare`. On some systems it may already be present.
+> * `tsu` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
 
 ### 2. Install the sandbox manager script
 
-The script must be installed inside the Termux prefix. Do not install it into `/bin`, which is read-only on Android.
+> [!WARNING]
+> The script must be installed inside the Termux prefix. Do not install it into `/bin`, which is read-only on Android.
 
 ```bash
 curl -L "https://github.com/788009/termux-sandbox/releases/download/latest/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
@@ -135,9 +139,11 @@ termux-sandbox create mysandbox --source /path/to/mybootstrap.zip
 termux-sandbox create mysandbox --source https://example.com/custom_bootstrap.zip
 ```
 
-The default bootstrap is not always the latest. You can find the latest version and more official bootstraps [here](https://github.com/termux/termux-packages/releases).
+> [!TIP]
+> The default bootstrap is not always the latest. You can find the latest version and more official bootstraps [here](https://github.com/termux/termux-packages/releases).
 
-**Note on Architectures**: When using a custom source, ensure the archive is built for the **correct architecture** (`ARMHF` or `ARM64`) of your device, as the script will skip the smart architecture detection.
+> [!NOTE] Note on Architectures
+> When using a custom source, ensure the archive is built for the **correct architecture** (`ARMHF` or `ARM64`) of your device, as the script will skip the smart architecture detection.
 
 ### Enter a sandbox (two modes)
 
@@ -161,11 +167,11 @@ termux-sandbox enter -b
 termux-sandbox enter mysandbox -b
 ```
 
-**Warning for Unrestricted Mode**:
-When using `-b`, you have **Real Root Access** to your physical file system.
-
-  * Deleting files in `/sdcard` will permanently delete them from your phone.
-  * Modifying `/host_root` can **BRICK** your device.
+> [!CAUTION] Warning for Unrestricted Mode
+> When using `-b`, you have **Real Root Access** to your physical file system.
+> 
+>   * Deleting files in `/sdcard` will permanently delete them from your phone.
+>   * Modifying `/host_root` can **BRICK** your device.
 
 ### Exiting the sandbox
 
@@ -185,10 +191,10 @@ termux-sandbox delete
 termux-sandbox delete mysandbox
 ```
 
-**Recommendation**:
-Always use the `termux-sandbox delete` command. This ensures that lock files and temporary scripts are cleaned up correctly.
-
-This tool uses Private Mount Namespaces. This means mounts created inside the sandbox are invisible to the host system. While manual deletion of the sandbox directory is safe, using the built-in delete command is still the preferred method to prevent state inconsistencies.
+> [!TIP]
+> Always use the `termux-sandbox delete` command. This ensures that lock files and temporary scripts are cleaned up correctly.
+> 
+> This tool uses Private Mount Namespaces. This means mounts created inside the sandbox are invisible to the host system. While manual deletion of the sandbox directory is safe, using the built-in delete command is still the preferred method to prevent state inconsistencies.
 
 ### Rename a sandbox
 

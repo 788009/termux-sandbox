@@ -3,7 +3,8 @@
 Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具备原生性能**的 Termux 环境。  
 本工具专为脚本测试、软件编译或维持主环境整洁而设计，无需依赖 `proot` 或容器运行时。
 
-**注意**：本工具提供的是**环境**隔离。虽然默认模式下限制了对宿主文件的访问，但它**并非安全虚拟机**，请勿用于分析复杂的恶意软件。
+> [!CAUTION] 
+> 本工具提供的是**环境**隔离。虽然默认模式下限制了对宿主文件的访问，但它**并非安全虚拟机**，请勿用于分析复杂的恶意软件。
 
 ![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
 
@@ -47,27 +48,28 @@ Termux Sandbox 能够在现有的 Termux 安装中运行**隔离、纯净且具�
 - 已安装 Termux 应用。
 - BusyBox 静态二进制文件（下方提供）。
 
-非 Root 用户可以尝试 [Yonle/termux-proot](https://github.com/Yonle/termux-proot)。
+> [!NOTE]
+> 非 Root 用户可以尝试 [Yonle/termux-proot](https://github.com/Yonle/termux-proot)。
 
-### 关于内核兼容性的说明
-
-本项目依赖 Linux 挂载命名空间（Mount Namespaces）。
-
-如果在 `tsu` 环境下运行时遇到以下错误：
-
-```
-unshare: Operation not permitted
-```
-
-这表明由于内核配置、SELinux 策略或厂商限制，你的设备不支持向用户进程开放挂载命名空间。在这种情况下，沙盒无法在该设备上运行。
-
-你也可以在 `tsu` 环境中运行以下命令来预先验证兼容性：
-
-```bash
-unshare --mount /bin/true
-```
-
-如果该命令返回错误，则说明你的内核不支持所需的隔离特性。
+> [!IMPORTANT] 关于内核兼容性的说明
+> 
+> 本项目依赖 Linux 挂载命名空间（Mount Namespaces）。
+> 
+> 如果在 `tsu` 环境下运行时遇到以下错误：
+> 
+> ```
+> unshare: Operation not permitted
+> ```
+> 
+> 这表明由于内核配置、SELinux 策略或厂商限制，你的设备不支持向用户进程开放挂载命名空间。在这种情况下，沙盒无法在该设备上运行。
+> 
+> 你也可以在 `tsu` 环境中运行以下命令来预先验证兼容性：
+> 
+> ```bash
+> unshare --mount /bin/true
+> ```
+> 
+> 如果该命令返回错误，则说明你的内核不支持所需的隔离特性。
 
 ## 安装
 
@@ -78,14 +80,16 @@ pkg update
 pkg install tsu curl zip clang util-linux -y
 ```
 
-  * `clang` 用于编译 `fake_uid.c` 以实现 UID 欺骗。
-  * `util-linux` 提供 `unshare` 工具，在某些系统中可能已经预装。
-  * `tsu` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -i` 可能会导致依赖解析失败。
+> [!NOTE]
+>   * `clang` 用于编译 `fake_uid.c` 以实现 UID 欺骗。
+>   * `util-linux` 提供 `unshare` 工具，在某些系统中可能已经预装。
+>   * `tsu` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -i` 可能会导致依赖解析失败。
 
 
 ### 2. 安装 termux-sandbox 脚本
 
-脚本必须安装在 Termux 的前缀（`$PREFIX`）路径内。切勿安装到系统的 `/bin` 目录，该目录在 Android 上是只读的。
+> [!WARNING]
+> 脚本必须安装在 Termux 的前缀（`$PREFIX`）路径内。切勿安装到系统的 `/bin` 目录，该目录在 Android 上是只读的。
 
 ```bash
 curl -L "https://github.com/788009/termux-sandbox/releases/download/latest/termux-sandbox" -o "$PREFIX/bin/termux-sandbox"
@@ -133,9 +137,11 @@ termux-sandbox create mysandbox --source /path/to/mybootstrap.zip
 termux-sandbox create mysandbox --source https://example.com/custom_bootstrap.zip
 ```
 
-当前的默认 bootstrap 并不总是最新版本，你可以在[这里](https://github.com/termux/termux-packages/releases)找到最新版本和其他官方版本。
+> [!TIP]
+> 当前的默认 bootstrap 并不总是最新版本，你可以在[这里](https://github.com/termux/termux-packages/releases)找到最新版本和其他官方版本。
 
-**注意**：使用自定义源时应自行确保 bootstrap 架构（ARMHF/ARM64）与你的设备匹配。
+> [!NOTE]
+> 使用自定义源时应自行确保 bootstrap 架构（`ARMHF`/`ARM64`）与你的设备匹配。
 
 ### 进入沙盒（两种模式）
 
@@ -159,11 +165,11 @@ termux-sandbox enter -b
 termux-sandbox enter --b mysandbox
 ```
 
-**无限制模式警告**：
-当使用 `-b` 参数时，你拥有对物理文件系统的**真实 Root 权限**。
-
-  * 删除 `/sdcard` 中的文件会将其从手机中彻底删除。
-  * 修改 `/host_root` 中的系统文件可能会导致手机**变砖**。
+> [!CAUTION] 无限制模式警告
+> 当使用 `-b` 参数时，你拥有对物理文件系统的**真实 Root 权限**。
+> 
+>   * 删除 `/sdcard` 中的文件会将其从手机中彻底删除。
+>   * 修改 `/host_root` 中的系统文件可能会导致手机**变砖**。
 
 
 ### 退出沙盒
@@ -186,10 +192,10 @@ termux-sandbox delete
 termux-sandbox delete mysandbox
 ```
 
-**建议**：
-务必始终使用 `termux-sandbox delete` 命令。这能确保正确清理锁文件和临时脚本。
-
-本工具使用了私有挂载命名空间 (Private Mount Namespaces)。这意味着在沙盒内部创建的挂载点对宿主系统是不可见的。虽然手动删除沙盒目录可以认为安全，但仍推荐使用内置的 delete 命令，以防止状态不一致。
+> [!TIP]
+> 务必始终使用 `termux-sandbox delete` 命令。这能确保正确清理锁文件和临时脚本。
+> 
+> 本工具使用了私有挂载命名空间 (Private Mount Namespaces)。这意味着在沙盒内部创建的挂载点对宿主系统是不可见的。虽然手动删除沙盒目录可以认为安全，但仍推荐使用内置的 delete 命令，以防止状态不一致。
 
 ### 重命名沙盒
 
