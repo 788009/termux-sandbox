@@ -8,14 +8,14 @@ It is designed for testing scripts, building software, or keeping the main envir
 > [!CAUTION] 
 > This tool only provides **environment** isolation, not **security** isolation. Therefore, it **must not** be used for malicious script testing.
 
-![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
+![example-enter.jpg](images/example-enter.jpg?raw=true)
 
 <details>
 <summary>More images (take Termux in Termux as an example)</summary>
 
-![example-create.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-create.jpg?raw=true)
+![example-create.jpg](images/example-create.jpg?raw=true)
 
-![example-use.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-use.jpg?raw=true)
+![example-use.jpg](images/example-use.jpg?raw=true)
 
 </details>
 

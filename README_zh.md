@@ -6,14 +6,14 @@ Termux Sandbox 能够在现有的 Termux 中运行**隔离、纯净且具备原�
 > [!CAUTION] 
 > 本工具提供的是**环境**隔离。虽然默认模式下限制了对宿主文件的访问，但它**并非安全虚拟机**，请勿用于分析复杂的恶意软件。
 
-![example-enter.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-enter.jpg?raw=true)
+![example-enter.jpg](images/example-enter.jpg?raw=true)
 
 <details>
 <summary>更多图片（以 Termux in Termux 为例）</summary>
 
-![example-create.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-create.jpg?raw=true)
+![example-create.jpg](images/example-create.jpg?raw=true)
 
-![example-use.jpg](https://github.com/788009/termux-sandbox/blob/main/images/example-use.jpg?raw=true)
+![example-use.jpg](images/example-use.jpg?raw=true)
 
 </details>
 
