@@ -19,6 +19,10 @@ It is designed for testing scripts, building software, or keeping the main envir
 
 </details>
 
+## Key Features
+
+Leveraging Chroot instead of Proot to create isolated environments, achieving operations with native efficiency—though root access is required as a result.
+
 ## Supported Environments
 
 Please choose a sandbox environment based on your needs:
