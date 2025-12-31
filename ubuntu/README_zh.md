@@ -219,6 +219,12 @@ ubuntu-sandbox import mysandbox.tar.gz
 ubuntu-sandbox import mysandbox.tar.gz -f
 ```
 
+### 卸载 `ubuntu-sandbox`
+
+```bash
+ubuntu-sandbox uninstall
+```
+
 ## 进阶使用
 
 ### 通过 Termux:X11 使用 Xfce4 桌面

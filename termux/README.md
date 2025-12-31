@@ -228,6 +228,12 @@ termux-sandbox import mysandbox.tar.gz
 termux-sandbox import mysandbox.tar.gz -f
 ```
 
+### Uninstall `termux-sandbox`
+
+```bash
+termux-sandbox uninstall
+```
+
 ## Implementation Overview
 
 * **Private Mount Namespaces (`unshare`)** are used to isolate the file system hierarchy. Mounts created inside the sandbox are invisible to the host, preventing accidental host data loss during cleanup.

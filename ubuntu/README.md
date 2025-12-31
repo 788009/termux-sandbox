@@ -214,6 +214,12 @@ ubuntu-sandbox import mysandbox.tar.gz
 ubuntu-sandbox import mysandbox.tar.gz -f
 ```
 
+### Uninstall `ubuntu-sandbox`
+
+```bash
+ubuntu-sandbox uninstall
+```
+
 ## Advanced Usage
 
 ### Running Xfce4 Desktop via Termux:X11

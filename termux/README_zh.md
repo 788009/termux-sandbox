@@ -228,6 +228,12 @@ termux-sandbox import mysandbox.tar.gz
 termux-sandbox import mysandbox.tar.gz -f
 ```
 
+### 卸载 `termux-sandbox`
+
+```bash
+termux-sandbox uninstall
+```
+
 ## 实现原理
 
 * **私有挂载命名空间 (`unshare`)** 用于隔离文件系统层级。沙盒内创建的挂载点对宿主不可见，从而防止在清理过程中意外导致宿主数据丢失。
