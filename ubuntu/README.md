@@ -129,6 +129,12 @@ ubuntu-sandbox create mysandbox --source https://example.com/custom_base.tar.gz
 > 
 > When using a custom source, ensure the Base architecture (`ARMHF`/`ARM64`) matches your device.
 
+> [!TIP]
+> 
+> **Explore More Distributions**
+> 
+> Although named `ubuntu-sandbox`, **testing with** other Linux rootfs images (such as Debian, Arch Linux ARM, etc.) via the `--source` flag **is encouraged**. Please open an issue if you encounter any problems or have successful experiences to share.
+
 ### Enter a sandbox (two modes)
 
 #### 1. Safe mode (recommended)

@@ -130,6 +130,12 @@ ubuntu-sandbox create mysandbox --source https://example.com/custom_base.tar.gz
 > 
 > 使用自定义源时应自行确保 Base 架构（`ARMHF`/`ARM64`）与你的设备匹配。
 
+> [!TIP]
+> 
+> **探索更多发行版**
+> 
+> 虽然本项目名为 `ubuntu-sandbox`，但你也可以尝试通过 `--source` 参数指定其他 Linux 发行版的 Rootfs（如 Debian、Arch Linux ARM 等）。欢迎尝试并在遇到问题或有成功经验时提交 Issues。
+
 ### 进入沙盒（两种模式）
 
 #### 1. 安全模式（推荐）

@@ -30,7 +30,7 @@ It is designed for testing scripts, building software, or keeping the main envir
 Please choose a sandbox environment based on your needs:
 
 - [**Termux** in Termux](termux/README.md)
-- [**Ubuntu** in Termux](ubuntu/README.md)
+- [**Ubuntu** in Termux](ubuntu/README.md) (potentially compatible with other distributions)
 
 ## Credits
 

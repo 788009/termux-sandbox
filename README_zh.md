@@ -28,7 +28,7 @@ Termux Sandbox 能够在现有的 Termux 中运行**隔离、纯净且具备原�
 请根据需求选择对应的沙盒环境：
 
 - [**Termux** in Termux](termux/README_zh.md)
-- [**Ubuntu** in Termux](ubuntu/README_zh.md)
+- [**Ubuntu** in Termux](ubuntu/README_zh.md) (或许也兼容其他发行版)
 
 ## 致谢
 
