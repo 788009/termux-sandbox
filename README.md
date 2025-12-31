@@ -19,9 +19,11 @@ It is designed for testing scripts, building software, or keeping the main envir
 
 </details>
 
-## Key Features
+## Core Features
 
-Leveraging Chroot instead of Proot to create isolated environments, achieving operations with native efficiency—though root access is required as a result.
+1. **Native Performance via Chroot**: Leveraging Chroot instead of Proot to create isolated environments, achieving operations with native efficiency—though root access is required as a result.
+2. **Automated Environment Management**: Automatically handles the native Chroot environment, network configurations, mount points, and permissions.
+3. **Docker-like Export/Import**: Easily backup, share, or migrate your entire sandbox environment with Docker-like export and import capabilities.
 
 ## Supported Environments
 
