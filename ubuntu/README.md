@@ -2,7 +2,7 @@
 
 [← Back to Root](../#supported-environments)
 
-`ubuntu-sandbox` facilitates the creation of clean, segregated Ubuntu instances within Termux, offering a robust set of management tools.
+`ubuntu-sandbox` facilitates the creation of clean, segregated Ubuntu instances within Termux ([and potentially other distributions](#2-using-a-custom-source)), offering a robust set of management tools.
 
 **Content**: [Features](#features) | [Requirements](#requirements) | [Installation](#installation) | [Usage](#usage) | [Advanced Usage](#advanced-usage) | [Implementation Overview](#implementation-overview)
 
