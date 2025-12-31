@@ -239,4 +239,4 @@ termux-sandbox import mysandbox.tar.gz -f
 
 ---
 
-[Back to Root](../README.md#supported-environments)
+[Back to Root](../#supported-environments)
