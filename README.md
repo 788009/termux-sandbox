@@ -36,6 +36,7 @@ Please choose a sandbox environment based on your needs:
 
 * Static BusyBox binary provided by [EXALAB/BusyBox-static](https://github.com/EXALAB/Busybox-static/blob/main/busybox_arm64).
 * Termux bootstrap packages from the [official Termux project](https://github.com/termux/termux-packages).
+* Ubuntu Base packages from the [official Ubuntu project](https://cdimage.ubuntu.com/ubuntu-base)
 
 ## License
 

@@ -34,6 +34,7 @@ Termux Sandbox 能够在现有的 Termux 中运行**隔离、纯净且具备原�
 
 * 静态 BusyBox 二进制文件由 [EXALAB/BusyBox-static](https://github.com/EXALAB/Busybox-static/blob/main/busybox_arm64) 提供。
 * Termux bootstrap 包来自 [Termux 官方项目](https://github.com/termux/termux-packages)。
+* Ubuntu Base 包来自 [Ubuntu 官方项目](https://cdimage.ubuntu.com/ubuntu-base)。
 
 ## 许可证
 
