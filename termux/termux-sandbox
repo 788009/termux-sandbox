@@ -1,0 +1,887 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+VERSION="20251231-0"
+
+# ======================================================
+# SECURITY & ENVIRONMENT PRE-CHECK (MANDATORY)
+# This must be the very first logic executed.
+# ======================================================
+
+# 1. Check for Root Privileges
+if [ "$(id -u)" -ne 0 ]; then
+    echo "❌ Error: Root privileges required."
+    echo "------------------------------------------------"
+    echo "This tool performs low-level system operations that require real root access."
+    echo ""
+    echo "FIX: Please run: tsu"
+    echo "------------------------------------------------"
+    exit 1
+fi
+
+# 2. Check for 'Clean' Environment (Must use tsu, not su)
+# Standard 'su' resets PATH to /system/bin, breaking Termux dependencies.
+if [[ ":$PATH:" != *":/data/data/com.termux/files/usr/bin:"* ]]; then
+    echo "❌ Error: 'Dirty' Root environment detected."
+    echo "------------------------------------------------"
+    echo "You are root, but you likely used 'su' instead of 'tsu'."
+    echo "Standard 'su' strips Termux environment variables, which will cause this script to crash during initialization."
+    echo ""
+    echo "FIX: Please use 'tsu' to enter the root session:"
+    echo "     1. Exit this session (type 'exit')"
+    echo "     2. Run: pkg install tsu (if not installed)"
+    echo "     3. Run: tsu"
+    echo "------------------------------------------------"
+    exit 1
+fi
+
+# ================= Configuration =================
+SANDBOX_NAME="${2:-default}"
+SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
+ARCH=$(dpkg --print-architecture)
+
+# Default: Termux Bootstrap 2025.11.30-r1+apt.android-7
+BOOTSTRAP_URL_ARM="https://github.com/termux/termux-packages/releases/download/bootstrap-2025.11.30-r1%2Bapt.android-7/bootstrap-arm.zip"
+BOOTSTRAP_URL_AARCH64="https://github.com/termux/termux-packages/releases/download/bootstrap-2025.11.30-r1%2Bapt.android-7/bootstrap-aarch64.zip"
+
+# Busybox configuration
+# ARM64 (aarch64)
+BUSYBOX_URL_AARCH64="https://github.com/788009/termux-sandbox/releases/download/latest/busybox_arm64"
+BUSYBOX_SHA256_AARCH64="f3154aad70b2928e3a57be3e4e966d2574904425fd63e717b9aa55933cfaf08c"
+
+# ARM (arm/armv7)
+BUSYBOX_URL_ARM="https://github.com/788009/termux-sandbox/releases/download/latest/busybox_arm"
+BUSYBOX_SHA256_ARM="03ac599984d511f41c1571814a85ad41a92ddd4d21691bff239b32f5e74dc49b"
+
+# Convert the dpkg architecture name into the required Busybox filename suffix
+BUSYBOX_SUFFIX=""
+case "$ARCH" in
+    aarch64)
+        BUSYBOX_SUFFIX="arm64" # Convert aarch64 to arm64
+        ;;
+    arm|armhf) 
+        BUSYBOX_SUFFIX="arm"   # Use arm for arm or armhf
+        ;;
+    *)
+        # Use architecture name directly for other architectures (e.g., x86_64)
+        BUSYBOX_SUFFIX="$ARCH"
+        ;;
+esac
+
+# Dynamic path based on the standardized BusyBox filename suffix
+BUSYBOX_PATH="$HOME/busybox_$BUSYBOX_SUFFIX"
+TARGET_DOMAIN="packages-cf.termux.dev"
+# ===============================================
+
+# Check unshare
+if ! command -v unshare >/dev/null; then
+    echo "[!] Error: 'unshare' is required for namespace isolation."
+    echo "    Please run: pkg install util-linux"
+    exit 1
+fi
+
+# Check if a sandbox is currently running
+# Returns 0 (true) if active, 1 (false) if idle
+is_active() {
+    local NAME="$1"
+    local LOCK_FILE="$HOME/.termux-sandbox/$NAME/.active"
+    
+    if [ -f "$LOCK_FILE" ]; then
+        # Optional: You could verify if the PID inside .active still exists, 
+        # but for simplicity, existence of the file implies activity.
+        return 0
+    fi
+    return 1
+}
+
+get_bootstrap_url() {
+    case "$ARCH" in
+        arm) echo "$BOOTSTRAP_URL_ARM" ;;
+        aarch64) echo "$BOOTSTRAP_URL_AARCH64" ;;
+        *) echo "Unsupported arch: $ARCH"; exit 1 ;;
+    esac
+}
+
+find_busybox() {
+    if [ -f "$BUSYBOX_PATH" ]; then echo "$BUSYBOX_PATH"; return; fi
+    SCRIPT_DIR=$(dirname "$(realpath "$0")")
+    # Check for local file with architecture suffix
+    if [ -f "$SCRIPT_DIR/busybox_$ARCH" ]; then echo "$SCRIPT_DIR/busybox_$ARCH"; return; fi
+    return 1
+}
+
+# Check and automatically download Busybox if missing
+check_busybox() {
+    local EXIST_PATH=$(find_busybox)
+    if [ -n "$EXIST_PATH" ]; then return 0; fi
+
+    echo "[!] Busybox binary not found."
+    
+    local CURRENT_URL=""
+    local CURRENT_SHA=""
+
+    # Select URL and SHA based on Architecture
+    case "$ARCH" in
+        aarch64)
+            CURRENT_URL="$BUSYBOX_URL_AARCH64"
+            CURRENT_SHA="$BUSYBOX_SHA256_AARCH64"
+            ;;
+        arm)
+            CURRENT_URL="$BUSYBOX_URL_ARM"
+            CURRENT_SHA="$BUSYBOX_SHA256_ARM"
+            ;;
+        *)
+            echo "[!] Error: Unsupported architecture: $ARCH"
+            echo "    This tool only supports aarch64 and arm."
+            exit 1
+            ;;
+    esac
+
+    echo "[+] Downloading Busybox for $ARCH..."
+    curl -L "$CURRENT_URL" -o "$BUSYBOX_PATH" --fail
+
+    if [ $? -ne 0 ]; then
+        echo "[!] Error: Failed to download Busybox. Please install it manually."
+        rm -f "$BUSYBOX_PATH"
+        exit 1
+    fi
+
+    echo "[*] Verifying checksum..."
+    local FILE_HASH=$(sha256sum "$BUSYBOX_PATH" | awk '{print $1}')
+    
+    if [ "$FILE_HASH" != "$CURRENT_SHA" ]; then
+        echo "[!] Error: Checksum mismatch!"
+        echo "    Expected: $CURRENT_SHA"
+        echo "    Actual:   $FILE_HASH"
+        echo "[!] Security Warning: The downloaded file may be corrupted."
+        rm -f "$BUSYBOX_PATH"
+        exit 1
+    fi
+    echo "[+] Checksum verified."
+
+    chmod 755 "$BUSYBOX_PATH"
+    echo "[+] Busybox installed to $BUSYBOX_PATH"
+}
+
+restore_symlinks() {
+    local TARGET_DIR="$1"
+    local SYMLINKS_FILE="$TARGET_DIR/SYMLINKS.txt"
+    if [ ! -f "$SYMLINKS_FILE" ]; then return; fi
+    echo "[+] Restoring symlinks..."
+    cd "$TARGET_DIR" || return
+    ln -sf coreutils bin/env
+    ln -sf bash bin/sh
+    awk -F '←' '{system("ln -sf " $1 " " $2)}' "$SYMLINKS_FILE" 2>/dev/null
+}
+
+resolve_ip() {
+    ping -c 1 "$1" 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | head -n 1 | tr -d '()'
+}
+
+check_dns() {
+    if ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then echo "8.8.8.8"; else echo "114.114.114.114"; fi
+}
+
+compile_fake_uid() {
+    local LIB_DIR="$SANDBOX_BASE/data/data/com.termux/files/usr/lib"
+    mkdir -p "$LIB_DIR"
+    echo "[*] Compiling UID spoofer..."
+    cat > "$SANDBOX_BASE/fake_uid.c" <<EOF
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <sys/types.h>
+uid_t getuid(void) { return 10000; }
+uid_t geteuid(void) { return 10000; }
+gid_t getgid(void) { return 10000; }
+gid_t getegid(void) { return 10000; }
+EOF
+    if command -v clang >/dev/null; then
+        clang -shared -fPIC "$SANDBOX_BASE/fake_uid.c" -o "$LIB_DIR/libfakeuid.so"
+    elif command -v gcc >/dev/null; then
+        gcc -shared -fPIC "$SANDBOX_BASE/fake_uid.c" -o "$LIB_DIR/libfakeuid.so"
+    else
+        echo "[!] Error: 'clang' or 'gcc' is required on host."
+        exit 1
+    fi
+    rm "$SANDBOX_BASE/fake_uid.c"
+}
+
+cmd_create() {
+    local TARGET_NAME=""
+    local CUSTOM_SOURCE=""
+
+    # === Argument Parsing ===
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --source)
+                if [ -n "$2" ] && [[ "$2" != -* ]]; then
+                    CUSTOM_SOURCE="$2"
+                    shift 2
+                else
+                    echo "[!] Error: --source requires a URL or file path."
+                    exit 1
+                fi
+                ;;
+            -*)
+                echo "[!] Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                if [ -z "$TARGET_NAME" ]; then
+                    TARGET_NAME="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    SANDBOX_NAME="${TARGET_NAME:-default}"
+    SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
+
+    echo "[*] Creating sandbox: $SANDBOX_NAME"
+    TERMUX_USR="$SANDBOX_BASE/data/data/com.termux/files/usr"
+    TERMUX_HOME="$SANDBOX_BASE/data/data/com.termux/files/home"
+    TERMUX_CACHE="$SANDBOX_BASE/data/data/com.termux/cache"
+    
+    if [ -d "$TERMUX_USR/bin" ]; then echo "[!] Environment exists."; exit 0; fi
+    
+    check_busybox
+    LOCAL_BUSYBOX=$(find_busybox)
+    if [ -z "$LOCAL_BUSYBOX" ]; then 
+        echo "[!] Error: Busybox not found even after download attempt."; exit 1
+    fi
+    
+    echo "[+] Creating structure..."
+    mkdir -p "$TERMUX_USR" "$TERMUX_HOME"
+    mkdir -p "$TERMUX_CACHE/apt/archives/partial"
+    mkdir -p "$TERMUX_USR/var/lib/dpkg/triggers"
+    mkdir -p "$TERMUX_USR/var/lib/dpkg/info"
+    mkdir -p "$TERMUX_USR/var/lib/dpkg/updates"
+    touch "$TERMUX_USR/var/lib/dpkg/status" "$TERMUX_USR/var/lib/dpkg/available"
+    
+    mkdir -p "$HOME/.termux-sandbox"
+
+    # === SOURCE SELECTION LOGIC ===
+    local BOOTSTRAP_FILE=""
+
+    if [ -n "$CUSTOM_SOURCE" ]; then
+        # Case A: User provided a source
+        echo "[*] Using custom source: $CUSTOM_SOURCE"
+        
+        if [ -f "$CUSTOM_SOURCE" ]; then
+            # A-1: Local File
+            BOOTSTRAP_FILE=$(realpath "$CUSTOM_SOURCE")
+        elif [[ "$CUSTOM_SOURCE" == http* ]]; then
+            # A-2: URL
+            BOOTSTRAP_FILE="$HOME/.termux-sandbox/custom_bootstrap.zip"
+            echo "[+] Downloading custom bootstrap..."
+            curl -L "$CUSTOM_SOURCE" -o "$BOOTSTRAP_FILE" --fail || exit 1
+        else
+            echo "[!] Error: Source must be a local file path or http(s) URL."
+            exit 1
+        fi
+    else
+        # Case B: Use Default
+        BOOTSTRAP_FILE="$HOME/.termux-sandbox/bootstrap.zip"
+        if [ ! -f "$BOOTSTRAP_FILE" ]; then
+            echo "[+] Downloading Default Bootstrap..."
+            curl -L $(get_bootstrap_url) -o "$BOOTSTRAP_FILE" --fail || exit 1
+        fi
+    fi
+    # ==============================
+    
+    echo "[+] Extracting..."
+    unzip -o -q "$BOOTSTRAP_FILE" -d "$TERMUX_USR"
+    restore_symlinks "$TERMUX_USR"
+    chmod -R 755 "$TERMUX_USR/bin"
+    if [ -d "$TERMUX_USR/lib/apt/methods" ]; then chmod -R 755 "$TERMUX_USR/lib/apt/methods"; fi
+
+    compile_fake_uid
+    
+    cp "$LOCAL_BUSYBOX" "$SANDBOX_BASE/busybox-static"
+    chmod 755 "$SANDBOX_BASE/busybox-static"
+    echo "[OK] Sandbox created."
+}
+
+cmd_enter() {
+    local TARGET_NAME=""
+    local BIND_HOST=false
+
+    # === Argument Parsing ===
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -b|--bind) BIND_HOST=true; shift ;;
+            -*) echo "[!] Unknown option: $1"; exit 1 ;;
+            *) [ -z "$TARGET_NAME" ] && TARGET_NAME="$1"; shift ;;
+        esac
+    done
+
+    SANDBOX_NAME="${TARGET_NAME:-default}"
+    SANDBOX_BASE="$HOME/.termux-sandbox/$SANDBOX_NAME"
+    
+    if [ ! -d "$SANDBOX_BASE/data/data/com.termux/files/usr/bin" ]; then 
+        echo "[!] Sandbox '$SANDBOX_NAME' not found."; exit 1
+    fi
+
+    # === Set Active ===
+
+    # 1. Lock File Logic
+    local LOCK_FILE="$SANDBOX_BASE/.active"
+    
+    if [ -f "$LOCK_FILE" ]; then
+        echo "[!] Warning: Sandbox appears to be active (Lock file exists)."
+        echo "    If you are sure it is not running, run: rm \"$LOCK_FILE\""
+    fi
+    
+    # Mark as active
+    touch "$LOCK_FILE"
+
+    # 2. Cleanup Trap (Updated to remove lock file)
+    cleanup_action() {
+        # Prevent interruption during cleanup
+        trap '' EXIT INT TERM
+        
+        # Remove lock file
+        rm -f "$LOCK_FILE"
+        
+        # Remove temp files used for namespace init
+        rm -f "$SANDBOX_BASE/busybox_static_internal" "$SANDBOX_BASE/entry.sh" "$SANDBOX_BASE/.ns_init.sh"
+    }
+    # Register the trap immediately
+    trap cleanup_action EXIT INT TERM
+    # ====================================================================
+
+    echo "[+] Entering sandbox: $SANDBOX_NAME"
+    if [ "$BIND_HOST" = true ]; then
+        echo "    Mode: UNRESTRICTED (Host Mounted)"
+    else
+        echo "    Mode: SAFE (Isolated)"
+    fi
+
+    local REPO_IP=$(resolve_ip "$TARGET_DOMAIN")
+    [ -z "$REPO_IP" ] && REPO_IP="104.21.57.147"
+    local DNS_SERVER=$(check_dns)
+    
+    # Calculate absolute path
+    local ABS_SANDBOX_BASE=$(realpath "$SANDBOX_BASE")
+    
+    # Define the initialization script path
+    local INIT_SCRIPT="$SANDBOX_BASE/.ns_init.sh"
+
+    # === GENERATE NAMESPACE INIT SCRIPT ===
+    # We write to a file instead of using <<EOF pipe to keep STDIN open for the shell
+    cat > "$INIT_SCRIPT" <<EOF
+#!/data/data/com.termux/files/usr/bin/bash
+
+# --- INSIDE ISOLATED NAMESPACE ---
+
+CHROOT_ROOT="$SANDBOX_BASE"
+MOUNT_BIN="/system/bin/mount"
+
+# Prepare busybox
+cp "\$CHROOT_ROOT/busybox-static" "\$CHROOT_ROOT/busybox_static_internal"
+chmod 755 "\$CHROOT_ROOT/busybox_static_internal"
+
+# === 1. Base System Mounts ===
+for item in /*; do
+    name=\$(basename "\$item")
+    case "\$name" in sdcard|storage|host_root|etc) continue ;; esac
+    
+    # Recursive check
+    abs_item=\$(realpath "\$item")
+    if [[ "$ABS_SANDBOX_BASE" == "\$abs_item"* ]]; then continue; fi
+    
+    if [ -L "\$item" ]; then
+        target=\$(readlink "\$item")
+        rm -f "\$CHROOT_ROOT/\$name"
+        ln -sf "\$target" "\$CHROOT_ROOT/\$name"
+    elif [ -d "\$item" ]; then
+        if [ ! -d "\$CHROOT_ROOT/\$name" ]; then mkdir -p "\$CHROOT_ROOT/\$name"; fi
+        \$MOUNT_BIN --rbind "\$item" "\$CHROOT_ROOT/\$name"
+    fi
+done
+
+# Essential Kernel Mounts
+mkdir -p "\$CHROOT_ROOT/dev" "\$CHROOT_ROOT/proc" "\$CHROOT_ROOT/sys"
+\$MOUNT_BIN --bind /dev "\$CHROOT_ROOT/dev"
+\$MOUNT_BIN --bind /dev/pts "\$CHROOT_ROOT/dev/pts"
+\$MOUNT_BIN --bind /proc "\$CHROOT_ROOT/proc"
+\$MOUNT_BIN --bind /sys "\$CHROOT_ROOT/sys"
+
+mkdir -p "\$CHROOT_ROOT/system"
+\$MOUNT_BIN --rbind /system "\$CHROOT_ROOT/system"
+
+# === 2. Optional Host Mounts ===
+if [ "$BIND_HOST" = true ]; then
+    mkdir -p "\$CHROOT_ROOT/host_root"
+    \$MOUNT_BIN -t tmpfs tmpfs "\$CHROOT_ROOT/host_root"
+    for item in /*; do
+        [ -d "\$item" ] && { mkdir -p "\$CHROOT_ROOT/host_root/\$(basename \$item)"; \$MOUNT_BIN --rbind "\$item" "\$CHROOT_ROOT/host_root/\$(basename \$item)"; }
+    done
+    
+    rm -rf "\$CHROOT_ROOT/sdcard"
+    mkdir -p "\$CHROOT_ROOT/sdcard"
+    if [ -d "/data/media/0" ]; then 
+        \$MOUNT_BIN --bind "/data/media/0" "\$CHROOT_ROOT/sdcard"
+    else 
+        \$MOUNT_BIN --bind "/sdcard" "\$CHROOT_ROOT/sdcard"
+    fi
+else
+    rm -rf "\$CHROOT_ROOT/sdcard" "\$CHROOT_ROOT/host_root"
+fi
+
+# === 3. Networking & Config ===
+# MOUNT tmpfs FIRST, then write files!
+\$MOUNT_BIN -t tmpfs tmpfs "\$CHROOT_ROOT/system/etc"
+
+echo "127.0.0.1 localhost" > "\$CHROOT_ROOT/system/etc/hosts"
+echo "$REPO_IP $TARGET_DOMAIN" >> "\$CHROOT_ROOT/system/etc/hosts"
+echo "nameserver $DNS_SERVER" > "\$CHROOT_ROOT/system/etc/resolv.conf"
+
+chmod 755 "\$CHROOT_ROOT/system/etc"
+chmod 644 "\$CHROOT_ROOT/system/etc/hosts"
+
+[ -d "/system/etc/security" ] && { mkdir -p "\$CHROOT_ROOT/system/etc/security"; \$MOUNT_BIN --bind "/system/etc/security" "\$CHROOT_ROOT/system/etc/security"; }
+
+mkdir -p "\$CHROOT_ROOT/etc"
+echo "root:x:0:0:root:/root:/bin/sh" > "\$CHROOT_ROOT/etc/passwd"
+echo "termux:x:10000:10000:Termux User:/data/data/com.termux/files/home:/data/data/com.termux/files/usr/bin/bash" >> "\$CHROOT_ROOT/etc/passwd"
+echo "root:x:0:" > "\$CHROOT_ROOT/etc/group"
+echo "termux:x:10000:" >> "\$CHROOT_ROOT/etc/group"
+
+cp "\$CHROOT_ROOT/system/etc/resolv.conf" "\$CHROOT_ROOT/etc/resolv.conf"
+cp "\$CHROOT_ROOT/system/etc/hosts" "\$CHROOT_ROOT/etc/hosts"
+
+# Update apt source inside (just to be safe)
+echo "deb https://$TARGET_DOMAIN/apt/termux-main stable main" > "\$CHROOT_ROOT/data/data/com.termux/files/usr/etc/apt/sources.list"
+rm -f "\$CHROOT_ROOT/data/data/com.termux/files/usr/etc/apt/apt.conf.d/99-trust-all"
+
+# Create Entry Script
+cat > "\$CHROOT_ROOT/entry.sh" <<ENTRY
+#!/busybox_static_internal sh
+TERMUX_USR="/data/data/com.termux/files/usr"
+TERMUX_BASH="\\\$TERMUX_USR/bin/bash"
+export PATH="/busybox_static_internal:\\\$TERMUX_USR/bin:/system/bin"
+export HOME="/data/data/com.termux/files/home"
+export TERM=xterm-256color
+export TMPDIR=\\\$TERMUX_USR/tmp
+export SSL_CERT_FILE=\\\$TERMUX_USR/etc/tls/cert.pem
+export SSL_CERT_DIR=/system/etc/security/cacerts
+FAKE_LIB="\\\$TERMUX_USR/lib/libfakeuid.so"
+
+echo "----------------------------------------"
+if [ "$BIND_HOST" = true ]; then
+    echo "WARNING: /sdcard and /host_root are ACCESSIBLE."
+else
+    echo "NOTE: Running in isolated mode (No /sdcard access)."
+fi
+echo "----------------------------------------"
+
+if [ -x "\\\$TERMUX_BASH" ]; then
+    export LD_PRELOAD="\\\$FAKE_LIB"
+    # -l: Make it a login shell
+    # -i: Force interactive mode (Critical to prevent exit on stdin issues)
+    exec \\\$TERMUX_BASH -l
+else
+    exec /busybox_static_internal sh
+fi
+ENTRY
+
+chmod 755 "\$CHROOT_ROOT/entry.sh"
+
+# Enter Chroot
+chroot "\$CHROOT_ROOT" /busybox_static_internal sh /entry.sh
+EOF
+
+    # Make the init script executable
+    chmod +x "$INIT_SCRIPT"
+
+    # Execute unshare using the script file
+    # This keeps STDIN free for the interactive shell!
+    unshare --mount --propagation private bash "$INIT_SCRIPT"
+
+    # Cleanup
+    rm -f "$LOCK_FILE"
+    rm -f "$SANDBOX_BASE/busybox_static_internal" "$SANDBOX_BASE/entry.sh" "$INIT_SCRIPT"
+    trap - EXIT INT TERM
+}
+
+cmd_delete() {
+    # 1. Check if directory exists
+    if [ ! -d "$SANDBOX_BASE" ]; then
+        echo "[!] Sandbox '$SANDBOX_NAME' not found."
+        return
+    fi
+
+    # 2. Check Lock File (Process Safety)
+    # This prevents deleting while a script is actively running inside
+    if is_active "$SANDBOX_NAME"; then
+        echo "[!] Sandbox is currently active (Lock file exists)."
+        echo "    Please exit the sandbox first."
+        return
+    fi
+
+    echo "[*] Deleting sandbox: $SANDBOX_NAME"
+
+    # ================== SAFETY BARRIER (LIFE SAVER) ==================
+    # 3. Mount Point Detection & Cleanup
+    # We check if the host kernel sees ANY mounts under the sandbox directory.
+    # This catches leaked global mounts (like your previous accident).
+    
+    # Attempt to unmount anything left over (Lazy unmount is safest)
+    # grep -F: Fixed string search (faster/safer)
+    if grep -qF "$SANDBOX_BASE" /proc/mounts; then
+        echo "    ⚠️  Warning: Residual mounts detected. Attempting to unmount..."
+        
+        # Try to unmount everything under that path
+        # awk prints the mount point, sort -r ensures deep paths unmount first
+        grep -F "$SANDBOX_BASE" /proc/mounts | awk '{print $2}' | sort -r | while read -r mountpoint; do
+            echo "        - Unmounting: $mountpoint"
+            umount -l "$mountpoint" 2>/dev/null
+        done
+    fi
+
+    # 4. FINAL CHECK - THE "DO NOT BRICK" SWITCH
+    # If after attempting unmount, it's STILL mounted, we MUST ABORT.
+    if grep -qF "$SANDBOX_BASE" /proc/mounts; then
+        echo ""
+        echo "❌ [CRITICAL ERROR] UNSAFE STATE DETECTED!"
+        echo "    The system still reports active mounts inside the sandbox."
+        echo "    Executing 'rm' now would delete HOST system files."
+        echo "    Path: $SANDBOX_BASE"
+        echo ""
+        echo "    Suggestion: Reboot your device to clear stuck mounts."
+        return 1
+    fi
+    # ====================================================================
+    
+    # 5. Safe to delete
+    # Only runs if the directory is purely files, no "wormholes" (mounts).
+    rm -rf "$SANDBOX_BASE"
+    
+    echo "[+] Sandbox deleted successfully."
+}
+
+cmd_rename() {
+    local OLD_NAME="$1"
+    local NEW_NAME="$2"
+
+    if [ -z "$OLD_NAME" ] || [ -z "$NEW_NAME" ]; then
+        echo "Usage: $(basename "$0") rename <old_name> <new_name>"
+        return
+    fi
+
+    local OLD_DIR="$HOME/.termux-sandbox/$OLD_NAME"
+    local NEW_DIR="$HOME/.termux-sandbox/$NEW_NAME"
+
+    # 1. Check if source exists
+    if [ ! -d "$OLD_DIR" ]; then
+        echo "[!] Sandbox '$OLD_NAME' not found."
+        return
+    fi
+
+    # 2. Check if target already exists
+    if [ -d "$NEW_DIR" ]; then
+        echo "[!] A sandbox named '$NEW_NAME' already exists."
+        return
+    fi
+
+    # 3. SAFETY CHECK: Ensure sandbox is not active
+    # Renaming a directory that has active mounts is dangerous and causes system confusion
+    if is_active "$OLD_NAME"; then
+        echo "[!] Sandbox is active. Please exit/stop it first before renaming."
+        return
+    fi
+
+    echo "[*] Renaming '$OLD_NAME' to '$NEW_NAME'..."
+    mv "$OLD_DIR" "$NEW_DIR"
+    
+    if [ $? -eq 0 ]; then
+        echo "[+] Rename successful."
+    else
+        echo "[!] Rename failed."
+    fi
+}
+
+cmd_duplicate() {
+    local SRC_NAME="$1"
+    local NEW_NAME="$2"
+
+    if [ -z "$SRC_NAME" ] || [ -z "$NEW_NAME" ]; then
+        echo "Usage: $(basename "$0") duplicate <source_name> <new_name>"
+        return
+    fi
+
+    local SRC_DIR="$HOME/.termux-sandbox/$SRC_NAME"
+    local NEW_DIR="$HOME/.termux-sandbox/$NEW_NAME"
+
+    # 1. Check if source exists
+    if [ ! -d "$SRC_DIR" ]; then
+        echo "[!] Source sandbox '$SRC_NAME' not found."
+        return
+    fi
+
+    # 2. Check if target already exists
+    if [ -d "$NEW_DIR" ]; then
+        echo "[!] A sandbox named '$NEW_NAME' already exists."
+        return
+    fi
+
+    # 3. SAFETY CHECK: Ensure source is not active
+    # Duplicating an active sandbox would recursively copy /sdcard and /host_root contents
+    # causing storage exhaustion and infinite loops.
+    if is_active "$SRC_NAME"; then
+        echo "[!] Sandbox is active. Please exit/stop it first before duplicating."
+        return
+    fi
+
+    echo "[*] Duplicating '$SRC_NAME' to '$NEW_NAME'..."
+    echo "    This may take a while depending on the size..."
+
+    # -p: Preserve mode, ownership, and timestamps (Critical for rootfs)
+    # -r: Recursive copy
+    cp -p -r "$SRC_DIR" "$NEW_DIR"
+
+    if [ $? -eq 0 ]; then
+        echo "[+] Duplicate successful."
+    else
+        echo "[!] Duplicate failed."
+        # Cleanup partial copy if failed
+        rm -rf "$NEW_DIR"
+    fi
+}
+
+cmd_export() {
+    local TARGET_NAME=""
+    local OUTPUT_FILE=""
+
+    # Parsing arguments to handle potential future flags
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            *)
+                if [ -z "$TARGET_NAME" ]; then TARGET_NAME="$1"; 
+                elif [ -z "$OUTPUT_FILE" ]; then OUTPUT_FILE="$1"; 
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [ -z "$TARGET_NAME" ] || [ -z "$OUTPUT_FILE" ]; then
+        echo "Usage: $(basename "$0") export <sandbox_name> <output_file.tar.gz>"
+        return
+    fi
+
+    local SANDBOX_DIR="$HOME/.termux-sandbox/$TARGET_NAME"
+    local ABS_OUTPUT_PATH=$(realpath "$OUTPUT_FILE")
+
+    if [ ! -d "$SANDBOX_DIR" ]; then
+        echo "[!] Sandbox '$TARGET_NAME' not found."
+        return
+    fi
+
+    if grep -q "$SANDBOX_DIR" /proc/mounts; then
+        echo "[!] Sandbox is active. Please exit/stop it first."
+        return
+    fi
+
+    echo "[*] Exporting sandbox: $TARGET_NAME"
+    echo "    Source: $SANDBOX_DIR"
+    echo "    Output: $ABS_OUTPUT_PATH"
+
+    # 1. Clean APT cache
+    local APT_CACHE="$SANDBOX_DIR/data/data/com.termux/files/usr/var/cache/apt/archives"
+    if [ -d "$APT_CACHE" ]; then
+        echo "[*] Cleaning APT cache to save space..."
+        rm -f "$APT_CACHE"/*.deb
+        rm -f "$APT_CACHE/partial"/*
+    fi
+
+    # 2. Generate Metadata
+    local META_FILE="$SANDBOX_DIR/.sandbox_meta"
+    echo "ARCH=$ARCH" > "$META_FILE"
+    echo "TIMESTAMP=$(date +%s)" >> "$META_FILE"
+    echo "VERSION=$(VERSION)" >> "$META_FILE"
+
+    echo "[*] Compressing..."
+    
+    local PARENT_DIR=$(dirname "$SANDBOX_DIR")
+    local DIR_NAME=$(basename "$SANDBOX_DIR")
+
+    # 3. Create Archive
+    (
+        cd "$PARENT_DIR" || exit 1
+        tar czvf "$ABS_OUTPUT_PATH" \
+            --exclude="$DIR_NAME/entry.sh" \
+            --exclude="$DIR_NAME/busybox_static" \
+            --exclude="$DIR_NAME/sdcard/*" \
+            --exclude="$DIR_NAME/host_root/*" \
+            --exclude="$DIR_NAME/data/data/com.termux/files/usr/tmp/*" \
+            "$DIR_NAME"
+    )
+    
+    local STATUS=$?
+
+    # 4. Clean up metadata from source
+    rm -f "$META_FILE"
+
+    if [ $STATUS -eq 0 ]; then
+        echo "[+] Export complete: $ABS_OUTPUT_PATH"
+    else
+        echo "[!] Export failed."
+    fi
+}
+
+cmd_import() {
+    local ARCHIVE_FILE=""
+    local FORCE_IMPORT=false
+
+    # Argument Parsing
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--force)
+                FORCE_IMPORT=true
+                shift
+                ;;
+            -*)
+                echo "[!] Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                if [ -z "$ARCHIVE_FILE" ]; then
+                    ARCHIVE_FILE="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    if [ -z "$ARCHIVE_FILE" ]; then
+        echo "Usage: $(basename "$0") import <file.tar.gz> [-f|--force]"
+        return
+    fi
+    
+    local ABS_ARCHIVE_PATH=$(realpath "$ARCHIVE_FILE")
+    
+    if [ ! -f "$ABS_ARCHIVE_PATH" ]; then
+        echo "[!] File not found: $ARCHIVE_FILE"
+        return
+    fi
+
+    # === Metadata Validation ===
+    # If forced, we skip the expensive tar scan entirely to save time.
+    if [ "$FORCE_IMPORT" = true ]; then
+        echo "[*] Force mode enabled: Skipping metadata verification."
+    else
+        echo "[*] Verifying metadata..."
+        
+        # Try to locate the .sandbox_meta file within the archive without extracting everything
+        local META_PATH_IN_TAR=$(tar tzf "$ABS_ARCHIVE_PATH" 2>/dev/null | grep "/.sandbox_meta$" | head -n 1)
+        
+        if [ -n "$META_PATH_IN_TAR" ]; then
+            # Extract only the metadata file to stdout
+            local META_CONTENT=$(tar xzOf "$ABS_ARCHIVE_PATH" "$META_PATH_IN_TAR" 2>/dev/null)
+            
+            # Parse architecture
+            local TAR_ARCH=$(echo "$META_CONTENT" | grep "ARCH=" | cut -d= -f2)
+            
+            echo "    Target Arch: $TAR_ARCH"
+            echo "    System Arch: $ARCH"
+            
+            if [ "$TAR_ARCH" != "$ARCH" ]; then
+                echo "❌ Error: Architecture mismatch!"
+                echo "    The sandbox was built for '$TAR_ARCH' but this device is '$ARCH'."
+                echo "    Importing this will likely result in binary format errors."
+                echo "    Use --force to skip this check if you are sure."
+                return 1
+            else
+                echo "[+] Architecture match."
+            fi
+        else
+            # No metadata found (legacy archive or manual backup)
+            echo "❌ Error: No metadata (.sandbox_meta) found in archive."
+            echo "    This might be a legacy archive or manually created backup."
+            echo "    Use --force to import legacy/unverified archives."
+            return 1
+        fi
+    fi
+    # ===========================
+
+    local BASE_DIR="$HOME/.termux-sandbox"
+    mkdir -p "$BASE_DIR"
+
+    echo "[*] Importing from $ABS_ARCHIVE_PATH..."
+    
+    # Extract archive
+    # -p: Preserve permissions (Essential for restoring the environment)
+    tar xzvpf "$ABS_ARCHIVE_PATH" -C "$BASE_DIR"
+    
+    if [ $? -eq 0 ]; then
+        echo "[+] Import complete."
+    else
+        echo "[!] Import failed."
+    fi
+}
+
+cmd_list() {
+    BASE_DIR="$HOME/.termux-sandbox"
+    
+    if [ ! -d "$BASE_DIR" ]; then
+        echo "[!] No sandboxes found."
+        return
+    fi
+
+    echo
+    printf "%-20s | %-10s\n" "SANDBOX NAME" "STATUS"
+    echo "---------------------+-----------"
+
+    found=0
+    for dir in "$BASE_DIR"/*; do
+        [ ! -d "$dir" ] && continue
+        
+        name=$(basename "$dir")
+        found=1
+        
+        # Modified check: Look for lock file instead of mounts
+        if [ -f "$dir/.active" ]; then
+            status="🟢 Active"
+        else
+            status="⚪ Idle"
+        fi
+        
+        printf "%-20s | %s\n" "$name" "$status"
+    done
+
+    if [ "$found" -eq 0 ]; then
+        echo "       (No sandboxes created)"
+    fi
+    echo
+}
+
+cmd_version() {
+    echo "Termux Sandbox $VERSION"
+}
+
+case "$1" in
+    version|--version) cmd_version ;;
+    create) shift; cmd_create "$@" ;;
+    enter)  shift; cmd_enter "$@"  ;;
+    delete) shift; cmd_delete "$@" ;;
+    rename) shift; cmd_rename "$@" ;;
+    duplicate) shift; cmd_duplicate "$@" ;;
+    export) shift; cmd_export "$@" ;;
+    import) shift; cmd_import "$@" ;;
+    list)   cmd_list ;;
+    *) 
+        echo "Usage:"
+        echo "  $(basename "$0") version"
+        echo "  $(basename "$0") create [name] [--source <url/file>]"
+        echo "  $(basename "$0") enter [name] [--bind|-b]"
+        echo "  $(basename "$0") delete [name]"
+        echo "  $(basename "$0") rename <old> <new>"
+        echo "  $(basename "$0") duplicate <src> <dest>"
+        echo "  $(basename "$0") export <name> <file.tar.gz>"
+        echo "  $(basename "$0") import <file.tar.gz> [--force|-f]"
+        echo "  $(basename "$0") list"
+        exit 1
+        ;;
+esac
