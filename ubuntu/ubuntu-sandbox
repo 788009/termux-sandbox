@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-VERSION="20251231-0"
+VERSION="20251231-1"
 
 # ======================================================
 # SECURITY & ENVIRONMENT PRE-CHECK (MANDATORY)
@@ -826,6 +826,69 @@ cmd_list() {
     echo
 }
 
+cmd_uninstall() {
+    # 1. Warning and Confirmation
+    echo "[DANGER ZONE] Uninstalling Ubuntu Sandbox"
+    echo "------------------------------------------------"
+    echo "This will:"
+    echo "  1. SAFELY delete ALL created sandboxes."
+    echo "  2. Remove the configuration directory ($HOME/.ubuntu-sandbox)."
+    echo "  3. Remove this script ($(realpath "$0"))."
+    echo "------------------------------------------------"
+    
+    printf "Are you sure you want to proceed? [y/N] "
+    read -r response
+    if [[ ! "$response" =~ ^[yY]$ ]]; then
+        echo "[*] Aborted."
+        return
+    fi
+
+    echo ""
+    echo "[*] Starting uninstallation..."
+
+    # 2. Iterate and safely delete all sandboxes
+    # We rely on cmd_delete because it contains the critical mount detection logic.
+    local BASE_DIR="$HOME/.ubuntu-sandbox"
+    
+    if [ -d "$BASE_DIR" ]; then
+        for dir in "$BASE_DIR"/*; do
+            if [ -d "$dir" ]; then
+                local sandbox_name=$(basename "$dir")
+                
+                # Invoke cmd_delete for a single sandbox
+                cmd_delete "$sandbox_name"
+                
+                # [CRITICAL SAFETY CHECK]
+                # If cmd_delete fails (e.g., active mounts detected that cannot be unmounted),
+                # we MUST halt immediately to prevent data loss.
+                if [ $? -ne 0 ]; then
+                    echo ""
+                    echo "❌ CRITICAL ERROR: Failed to safely remove sandbox '$sandbox_name'."
+                    echo "    Uninstallation halted to protect your data."
+                    echo "    Please resolve the mount issue manually and try again."
+                    exit 1
+                fi
+            fi
+        done
+        
+        # 3. Remove configuration directory
+        # At this point, no mounts should exist, safe to remove.
+        echo "[*] Removing configuration directory..."
+        rm -rf "$BASE_DIR"
+    else
+        echo "[*] No configuration directory found."
+    fi
+
+    # 4. Remove the script itself
+    local SCRIPT_PATH=$(realpath "$0")
+    if [ -f "$SCRIPT_PATH" ]; then
+        echo "[*] Removing script: $SCRIPT_PATH"
+        rm -f "$SCRIPT_PATH"
+    fi
+
+    echo "Uninstallation complete."
+}
+
 cmd_version() {
     echo "Ubuntu Sandbox $VERSION"
 }
@@ -840,6 +903,7 @@ case "$1" in
     export) shift; cmd_export "$@" ;;
     import) shift; cmd_import "$@" ;;
     list)   cmd_list ;;
+    uninstall) cmd_uninstall ;;
     *) 
         echo "Usage:"
         echo "  $(basename "$0") version"
@@ -851,6 +915,7 @@ case "$1" in
         echo "  $(basename "$0") export <name> <file.tar.gz>"
         echo "  $(basename "$0") import <file.tar.gz> [--force|-f]"
         echo "  $(basename "$0") list"
+        echo "  $(basename "$0") uninstall"
         exit 1
         ;;
 esac
