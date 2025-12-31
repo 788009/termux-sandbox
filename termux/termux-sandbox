@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-VERSION="20251231-0"
+VERSION="20251231-1"
 
 # ======================================================
 # SECURITY & ENVIRONMENT PRE-CHECK (MANDATORY)
