@@ -1,6 +1,6 @@
 # Termux in Termux
 
-[← Back to Root](../README.md#supported-environments)
+[← Back to Root](../#supported-environments)
 
 `termux-sandbox` facilitates the creation of clean, segregated Termux instances, offering a robust set of management tools.
 

@@ -1,6 +1,6 @@
 # Ubuntu in Termux
 
-[← Back to Root](../README.md#supported-environments)
+[← Back to Root](../#supported-environments)
 
 `ubuntu-sandbox` facilitates the creation of clean, segregated Ubuntu instances within Termux, offering a robust set of management tools.
 
