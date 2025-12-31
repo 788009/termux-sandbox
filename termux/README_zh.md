@@ -4,7 +4,7 @@
 
 `termux-sandbox` 用于在 Termux 中创建全新且隔离的 Termux 环境，并提供完善的管理功能。
 
-**目录**：[特性](#特性) | [运行要求](#运行要求) | [安装](#安装) | [使用方法](#使用方法)
+**目录**：[特性](#特性) | [运行要求](#运行要求) | [安装](#安装) | [使用方法](#使用方法) | [实现原理](#实现原理)
 
 ## 特性
 
@@ -227,8 +227,6 @@ termux-sandbox import mysandbox.tar.gz
 # 使用 --force 或 -f 以跳过元数据检查
 termux-sandbox import mysandbox.tar.gz -f
 ```
-
-</details>
 
 ## 实现原理
 

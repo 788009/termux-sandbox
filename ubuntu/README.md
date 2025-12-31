@@ -4,7 +4,7 @@
 
 `ubuntu-sandbox` facilitates the creation of clean, segregated Ubuntu instances within Termux, offering a robust set of management tools.
 
-**Content**: [Features](#features) | [Requirements](#requirements) | [Installation](#installation) | [Usage](#usage) | [Advanced Usage](#advanced-usage)
+**Content**: [Features](#features) | [Requirements](#requirements) | [Installation](#installation) | [Usage](#usage) | [Advanced Usage](#advanced-usage) | [Implementation Overview](#implementation-overview)
 
 ## Features
 
@@ -268,6 +268,14 @@ It is recommended to save the above commands as a script, allowing you to start 
 > **About GPU Acceleration**
 > 
 > Starting the Xfce4 desktop using the method above will utilize `llvmpipe`, meaning the CPU handles all rendering computations. While it is **possible** to access the device's GPU within the sandbox, the implementation details vary significantly across different hardware brands. As such, these steps are not covered in detail here; please feel free to experiment if needed.
+
+## Implementation Overview
+
+* **Private Mount Namespaces (`unshare`)** are used to isolate the file system hierarchy. Mounts created inside the sandbox are invisible to the host, preventing accidental host data loss during cleanup.
+* **Chroot** provides a minimal root filesystem based on the Termux bootstrap.
+* **Network Namespace Sharing** allows the sandbox to use the host's network connection directly.
+* **Automatic DNS Configuration** generates a standard Linux `/etc/resolv.conf` by auto-detecting DNS connectivity, bypassing Android-specific DNS properties that often fail inside chroots.
+* **Smart Exporting**: When exporting, APT caches and runtime files (busybox, entry scripts, mount points) are automatically excluded to minimize the archive size.
 
 ---
 

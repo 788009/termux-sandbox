@@ -4,7 +4,7 @@
 
 `termux-sandbox` facilitates the creation of clean, segregated Termux instances, offering a robust set of management tools.
 
-**Content**: [Features](#features) | [Requirements](#requirements) | [Installation](#installation) | [Usage](#usage)
+**Content**: [Features](#features) | [Requirements](#requirements) | [Installation](#installation) | [Usage](#usage) | [Implementation Overview](#implementation-overview)
 
 ## Features
 
