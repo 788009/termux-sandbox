@@ -38,7 +38,7 @@
 > 
 > This project relies on Linux mount namespaces.
 > 
-> If you encounter the following error when running under `tsu`:
+> If you encounter the following error when running under `sudo bash`:
 > 
 > ```
 > unshare: Operation not permitted
@@ -46,7 +46,7 @@
 > 
 > It indicates that mount namespaces are not available to user processes on your device due to kernel configuration, SELinux policy, or vendor restrictions. In this case, the sandbox cannot function.
 > 
-> You can verify compatibility by running this command in `tsu`:
+> You can verify compatibility by running this command in `sudo bash`:
 > 
 > ```bash
 > unshare --mount /bin/true
@@ -60,13 +60,13 @@
 
 ```bash
 pkg update
-pkg install tsu curl zip util-linux -y
+pkg install sudo curl zip util-linux -y
 ```
 
 > [!NOTE]
 > 
 > * `util-linux` provides the `unshare` tool. On some systems, it may already be present.
-> * `tsu` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
+> * `sudo` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
 
 ### 2. Install the ubuntu-sandbox script
 
@@ -83,7 +83,7 @@ chmod +x "$PREFIX/bin/ubuntu-sandbox"
 
 > [!WARNING]
 > 
-> Requires `tsu` environment.
+> Requires `sudo bash` environment.
 
 > [!TIP]
 > 

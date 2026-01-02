@@ -46,7 +46,7 @@
 > 
 > 本项目依赖 Linux 挂载命名空间（Mount Namespaces）。
 > 
-> 如果在 `tsu` 环境下运行时遇到以下错误：
+> 如果在 `sudo bash` 环境下运行时遇到以下错误：
 > 
 > ```
 > unshare: Operation not permitted
@@ -54,7 +54,7 @@
 > 
 > 这表明由于内核配置、SELinux 策略或厂商限制，你的设备不支持向用户进程开放挂载命名空间。在这种情况下，沙盒无法在该设备上运行。
 > 
-> 你也可以在 `tsu` 环境中运行以下命令来预先验证兼容性：
+> 你也可以在 `sudo bash` 环境中运行以下命令来预先验证兼容性：
 > 
 > ```bash
 > unshare --mount /bin/true
@@ -68,14 +68,14 @@
 
 ```bash
 pkg update
-pkg install tsu curl zip clang util-linux -y
+pkg install sudo curl zip clang util-linux -y
 ```
 
 > [!NOTE]
 > 
 >   * `clang` 用于编译 `fake_uid.c` 以实现 UID 欺骗。
 >   * `util-linux` 提供 `unshare` 工具，在某些系统中可能已经预装。
->   * `tsu` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -i` 可能会导致依赖解析失败。
+>   * `sudo` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -i` 可能会导致依赖解析失败。
 
 
 ### 2. 安装 termux-sandbox 脚本
@@ -93,7 +93,7 @@ chmod +x "$PREFIX/bin/termux-sandbox"
 
 > [!WARNING]
 >
-> 需要 `tsu` 环境
+> 需要 `sudo bash` 环境
 
 > [!TIP]
 > 
