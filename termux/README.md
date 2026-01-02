@@ -76,7 +76,7 @@ pkg install sudo curl zip clang util-linux -y
 > 
 > * `clang` is required to compile `fake_uid.c` for UID spoofing.
 > * `util-linux` provides `unshare`. On some systems it may already be present.
-> * `sudo` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -i` may cause dependency resolution failures.
+> * `sudo` is used to maintain Termux environment variables (like `$PATH`) while operating with root privileges. Using standard `su` or `su -c` may cause dependency resolution failures.
 
 ### 2. Install the sandbox manager script
 

@@ -71,7 +71,7 @@ pkg install sudo curl zip util-linux -y
 > [!NOTE]
 > 
 >   * `util-linux` 提供 `unshare` 工具，在某些系统中可能已经预装。
->   * `sudo` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -i` 可能会导致依赖解析失败。
+>   * `sudo` 用于在以 Root 权限操作时保持 Termux 的环境变量（如 `$PATH`）。使用标准的 `su` 或 `su -c` 可能会导致依赖解析失败。
 
 ### 2. 安装 ubuntu-sandbox 脚本
 
