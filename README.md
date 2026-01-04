@@ -2,9 +2,9 @@
 
 [中文](README_zh.md)
 
-Termux Sandbox provides native-performance Linux environments within Termux, bypassing the overhead of Proot while automating the tedious setup of traditional Chroot (networking, mounts, and permissions).
+Termux Sandbox provides **native-performance Linux environments** within Termux, bypassing the overhead of Proot while automating the tedious setup of traditional Chroot (networking, mounts, and permissions).
 
-It is the ideal "one-click" solution for high-performance software building or maintaining clean, isolated sandboxes for Termux and Ubuntu (and more).
+It is the ideal **"one-click" solution** for high-performance software building or maintaining clean, isolated sandboxes for Termux and Ubuntu (and more).
 
 > [!CAUTION] 
 > This tool only provides **environment** isolation, not **security** isolation. Therefore, it **must not** be used for malicious script testing.
