@@ -1,6 +1,6 @@
 # Termux Sandbox
 
-termux-sandbox 为 Termux 提供具备原生性能的 Linux 环境。它在性能上彻底超越了 Proot，同时将传统 Chroot 繁琐的配置过程（网络、挂载与权限）实现了完全自动化。
+Termux Sandbox 为 Termux 提供具备原生性能的 Linux 环境。它在性能上彻底超越了 Proot，同时将传统 Chroot 繁琐的配置过程（网络、挂载与权限）实现了完全自动化。
 
 无论是追求极致性能的软件编译，还是需要纯净隔离的 Termux 或 Ubuntu 环境（亦可能兼容其他发行版），本项目都能提供“开箱即用”的沙盒体验。
 
