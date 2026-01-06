@@ -233,16 +233,76 @@ ubuntu-sandbox uninstall
 
 ## 进阶使用
 
-### 通过 Termux:X11 使用 Xfce4 桌面
+### 在沙盒中使用 Termux:X11
 
-#### 安装环境
+> [!NOTE]
+>
+> <details>
+> <summary>什么是 Termux:X11？</summary>
+>
+> Termux:X11 是一个功能完备且高性能的 X 服务器。它是目前 Termux 生态中最受推崇、体验最流畅的图形显示方案。
+>
+> #### 安装
+> 
+> 在你的手机中安装与 Termux 相同来源（如 GitHub 或 F-Droid）的 Termux:X11，然后在 Termux 宿主环境安装 `x11-repo`：
+> 
+> ```bash
+> pkg update
+> pkg install x11-repo -y
+> ```
+>
+> #### 一般使用方式（仅限宿主环境）
+>
+> 启动服务并设置环境变量：
+>
+> ```bash
+> termux-x11 :0
+> # 或者使用 termux-x11 :0 & 来释放终端占用
+> export DISPLAY=:0
+> ```
+>
+> 然后就可以运行需要图形界面的应用（大部分应用无需额外配置），更多信息请参考[官方仓库](https://github.com/termux/termux-x11)。
+>
+> </details>
 
-在你的手机中安装与 Termux 相同来源（如 GitHub 或 F-Droid）的 Termux:X11，然后在 Termux 宿主环境安装 `x11-repo`：
+在沙盒中使用 Termux:X11 需要一些额外配置。
+
+#### 启动服务
+
+在 Termux 宿主环境启动 Termux:X11 服务：
 
 ```bash
-pkg update
-pkg install x11-repo -y
+termux-x11 :0 -ac
 ```
+
+#### 连接服务
+
+在 `-b|--bind` 模式下的沙盒内：
+
+```bash
+mkdir -p /tmp/.X11-unix
+mount --bind /host_root/data/data/com.termux/files/usr/tmp/.X11-unix /tmp/.X11-unix
+export DISPLAY=:0
+```
+
+之后即可正常使用。
+
+> [!NOTE]
+> - `-ac` 参数：用于禁用 X11 的访问控制，确保隔离环境内的进程有权连接到宿主环境的显示服务。
+> - `-b|--bind` 模式：用于访问沙盒外部的 `.X11-unix`。
+> - 挂载 `.X11-unix`：X11 依靠 Unix 域套接字通信。通过挂载，沙盒内的 Xfce4 才能通过宿主环境的套接字文件（Socket）与 Termux:X11 建立联系。
+
+> [!TIP]
+>
+> **关于 GPU**
+>
+> 用上面的方法使用 Termux:X11 会使用 `llvmpipe`，也就是 CPU 执行所有运算。在沙盒内是**可以**连接手机 GPU 的，但不同品牌细节各不相同，故不在此详述，如有需要请自行尝试。
+
+### 通过 Termux:X11 使用 Xfce4 桌面
+
+> [!IMPORTANT]
+>
+> 请先阅读[上一节](#在沙盒中使用-termuxx11)。
 
 在沙盒中安装依赖：
 
@@ -272,17 +332,6 @@ xfce4-session
 ```
 
 推荐将以上命令保存为脚本，这样一行命令即可启动桌面。
-
-> [!NOTE]
-> - `-ac` 参数：用于禁用 X11 的访问控制，确保隔离环境内的进程有权连接到宿主环境的显示服务。
-> - `-b|--bind` 模式：用于访问沙盒外部的 `.X11-unix`。
-> - 挂载 `.X11-unix`：X11 依靠 Unix 域套接字通信。通过挂载，沙盒内的 Xfce4 才能通过宿主环境的套接字文件（Socket）与 Termux:X11 建立联系。
-
-> [!TIP]
->
-> **关于 GPU**
->
-> 用上面的方法启动 Xfce4 桌面会使用 `llvmpipe`，也就是 CPU 执行所有运算。在沙盒内是**可以**连接手机 GPU 的，但不同品牌细节各不相同，故不在此详述，如有需要请自行尝试。
 
 ## 实现原理
 

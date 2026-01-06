@@ -228,16 +228,75 @@ ubuntu-sandbox uninstall
 
 ## Advanced Usage
 
-### Running Xfce4 Desktop via Termux:X11
+### Using Termux:X11 in Sandbox
 
-#### Environment Setup
+> [!NOTE]
+> 
+> <details>
+> <summary>What is Termux:X11?</summary>
+>
+> Termux:X11 is a fully fledged X server. It is currently the most recommended and smoothest graphical display solution in the Termux ecosystem.
+> 
+> #### Installation
+> 
+> Install Termux:X11 from the same source as your Termux app (e.g., GitHub or F-Droid). Then, install `x11-repo` in the Termux host environment:
+> 
+> ```bash
+> pkg update
+> pkg install x11-repo -y
+> ```
+> 
+> #### General Usage (Host Only)
+> 
+> Start the service and set the environment variable:
+> ```bash
+> termux-x11 :0
+> # Or use termux-x11 :0 & to run in background
+> export DISPLAY=:0
+> ```
+>
+> Then you can run applications that require a graphical interface (most applications require no additional configuration). For more information, please refer to the [official repository](https://github.com/termux/termux-x11).
+> 
+> </details>
 
-Install Termux:X11 from the same source as your Termux app (e.g., GitHub or F-Droid). Then, install `x11-repo` in the Termux host environment:
+Using Termux:X11 inside the sandbox requires some additional configuration.
+
+#### Start Service
+
+Start the Termux:X11 service in the Termux host:
 
 ```bash
-pkg update
-pkg install x11-repo -y
+termux-x11 :0 -ac
 ```
+
+#### Connect to Service
+
+Inside the sandbox (running in `-b|--bind` mode):
+
+```bash
+mkdir -p /tmp/.X11-unix
+mount --bind /host_root/data/data/com.termux/files/usr/tmp/.X11-unix /tmp/.X11-unix
+export DISPLAY=:0
+```
+
+After these steps, you can use X11 applications normally.
+
+> [!NOTE]
+> 
+> * `-ac` flag: Disables X11 access control, ensuring processes within the isolated environment can connect to the host's display service.
+> * `-b|--bind` mode: Required to access the `.X11-unix` socket outside the sandbox.
+> * Mounting `.X11-unix`: X11 relies on Unix Domain Sockets for communication. By mounting this directory, applications inside the sandbox can communicate with Termux:X11 via the host's socket file.
+
+> [!TIP]
+> 
+> **About GPU Acceleration**
+> 
+> Using Termux:X11 with the method above will utilize `llvmpipe`, meaning the CPU handles all rendering computations. While it is **possible** to access the device's GPU within the sandbox, the implementation details vary significantly across different hardware brands. Feel free to experiment if needed.
+
+### Running Xfce4 Desktop via Termux:X11
+
+> [!IMPORTANT]
+> Please read the [previous section](#using-termuxx11-in-sandbox) first.
 
 Install dependencies inside the sandbox:
 
@@ -247,10 +306,9 @@ apt install xfce4 dbus-x11 -y
 ```
 
 > [!NOTE]
-> 
 > Ubuntu Base provides a minimal environment and does not include `dbus-x11`. Since `xfce4` relies on `dbus-launch` from the `dbus-x11` package to initialize sessions, it must be installed manually.
 
-#### Start Services
+#### Start Desktop
 
 Start the Termux:X11 service in the Termux host:
 
@@ -268,18 +326,6 @@ xfce4-session
 ```
 
 It is recommended to save the above commands as a script, allowing you to start the desktop with a single command.
-
-> [!NOTE]
-> 
-> - `-ac` flag: Disables X11 access control, ensuring processes within the isolated environment can connect to the host's display service.
-> - `-b|--bind` mode: Required to access the `.X11-unix` socket outside the sandbox.
-> - Mounting `.X11-unix`: X11 relies on Unix Domain Sockets for communication. By mounting this directory, Xfce4 inside the sandbox can communicate with Termux:X11 via the host's socket file.
-
-> [!TIP]
-> 
-> **About GPU Acceleration**
-> 
-> Starting the Xfce4 desktop using the method above will utilize `llvmpipe`, meaning the CPU handles all rendering computations. While it is **possible** to access the device's GPU within the sandbox, the implementation details vary significantly across different hardware brands. As such, these steps are not covered in detail here; please feel free to experiment if needed.
 
 ## Implementation Overview
 
