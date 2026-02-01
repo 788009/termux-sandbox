@@ -39,6 +39,10 @@ Please choose a sandbox environment based on your needs:
 * Termux bootstrap packages from the [official Termux project](https://github.com/termux/termux-packages).
 * Ubuntu Base packages from the [official Ubuntu project](https://cdimage.ubuntu.com/ubuntu-base)
 
+## Support
+
+If this project helped you, please give it a star!
+
 ## License
 
 MIT License

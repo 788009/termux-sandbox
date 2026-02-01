@@ -37,6 +37,10 @@ Termux Sandbox 为 Termux 提供具备**原生性能的 Linux 环境**。它在�
 * Termux bootstrap 包来自 [Termux 官方项目](https://github.com/termux/termux-packages)。
 * Ubuntu Base 包来自 [Ubuntu 官方项目](https://cdimage.ubuntu.com/ubuntu-base)。
 
+## 鼓励与支持
+
+如果觉得不错，欢迎点个 Star 支持一下。
+
 ## 许可证
 
 MIT License
