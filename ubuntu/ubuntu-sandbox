@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-VERSION="20260102-0"
+VERSION="20260210-0"
 
 # ======================================================
 # SECURITY & ENVIRONMENT PRE-CHECK (MANDATORY)
@@ -109,12 +109,40 @@ find_busybox() {
     return 1
 }
 
-# Check and automatically download Busybox if missing
+# Check and setup Busybox
 check_busybox() {
+    # 1. Priority: Check for system-provided Busybox (Magisk/KernelSU/APatch)
+    # These binaries are guaranteed to be compatible with the current kernel (e.g., 16k page size).
+    local SYSTEM_PATHS=(
+        "/data/adb/magisk/busybox"
+        "/data/adb/ksu/bin/busybox"
+        "/data/adb/ap/bin/busybox"
+    )
+
+    for sys_path in "${SYSTEM_PATHS[@]}"; do
+        if [ -f "$sys_path" ]; then
+            echo "[*] System busybox found: $sys_path"
+            
+            # Copy to our internal path to ensure consistency and permissions
+            cp -f "$sys_path" "$BUSYBOX_PATH"
+            chmod 755 "$BUSYBOX_PATH"
+            
+            # Verify it actually runs (sanity check)
+            if "$BUSYBOX_PATH" true >/dev/null 2>&1; then
+                echo "[+] Using system busybox (Compatible mode)."
+                return 0
+            else
+                echo "[!] Warning: System busybox found but failed to run. Ignoring."
+            fi
+        fi
+    done
+
+    # 2. Check if we already have a valid local copy
     local EXIST_PATH=$(find_busybox)
     if [ -n "$EXIST_PATH" ]; then return 0; fi
 
-    echo "[!] Busybox binary not found."
+    # 3. Fallback: Download from GitHub
+    echo "[!] System busybox not found. Downloading fallback..."
     local CURRENT_URL=""
     local CURRENT_SHA=""
 
